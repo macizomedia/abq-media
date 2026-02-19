@@ -1,0 +1,14 @@
+{
+  "name": "@abquanta/adapter-youtube",
+  "version": "0.1.0",
+  "description": "YouTube adapter for metadata and source handling.",
+  "type": "module",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "echo 'build adapter-youtube'",
+    "test": "echo 'test adapter-youtube'",
+    "lint": "echo 'lint adapter-youtube'",
+    "clean": "echo 'clean adapter-youtube'"
+  }
+}

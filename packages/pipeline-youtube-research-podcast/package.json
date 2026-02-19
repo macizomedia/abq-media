@@ -1,0 +1,42 @@
+{
+  "name": "@abquanta/pipeline-youtube-research-podcast",
+  "version": "0.1.0",
+  "description": "YouTube -> research -> podcast pipeline module",
+  "type": "module",
+  "bin": {
+    "abq-yt-rp": "src/cli.js"
+  },
+  "main": "src/index.js",
+  "license": "MIT",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "init": "node ./src/cli/init.js",
+    "build": "echo 'build not configured yet'",
+    "test": "echo 'test not configured yet'",
+    "lint": "echo 'lint not configured yet'",
+    "clean": "echo 'clean not configured yet'"
+  },
+  "keywords": [
+    "abquanta",
+    "youtube",
+    "research",
+    "podcast",
+    "llm"
+  ],
+  "author": "abquanta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abquanta/pipeline-youtube-research-podcast.git"
+  },
+  "bugs": {
+    "url": "https://github.com/abquanta/pipeline-youtube-research-podcast/issues"
+  },
+  "homepage": "https://github.com/abquanta/pipeline-youtube-research-podcast#readme"
+}

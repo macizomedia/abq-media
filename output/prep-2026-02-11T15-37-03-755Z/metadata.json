@@ -1,0 +1,11 @@
+{
+  "stage": "prep",
+  "source": "YouTube video",
+  "url": "https://youtu.be/DGWtSzqCpog?si=hmqYPS7PY0pNZsKS",
+  "videoId": "DGWtSzqCpog",
+  "lang": "es",
+  "transcriptMode": "asr-openai",
+  "transcriptSource": "asr-openai:gpt-4o-mini-transcribe",
+  "digestMode": "heuristic (llm fallback: Agent HTTP 500: {\"error\":\"internal_error\",\"message\":\"User not found.\"})",
+  "createdAt": "2026-02-11T15:37:41.886Z"
+}

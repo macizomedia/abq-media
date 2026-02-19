@@ -1,0 +1,14 @@
+{
+  "name": "@abquanta/adapter-tts-soundcloud",
+  "version": "0.1.0",
+  "description": "Spanish TTS + SoundCloud publishing adapter.",
+  "type": "module",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "echo 'build adapter-tts-soundcloud'",
+    "test": "echo 'test adapter-tts-soundcloud'",
+    "lint": "echo 'lint adapter-tts-soundcloud'",
+    "clean": "echo 'clean adapter-tts-soundcloud'"
+  }
+}

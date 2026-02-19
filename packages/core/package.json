@@ -1,0 +1,14 @@
+{
+  "name": "@abquanta/abq-media-core",
+  "version": "0.1.0",
+  "description": "Core contracts and pipeline types for Abquanta media workflows.",
+  "type": "module",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "echo 'build core'",
+    "test": "echo 'test core'",
+    "lint": "echo 'lint core'",
+    "clean": "echo 'clean core'"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@abquanta/abq-media-cli",
+  "version": "0.1.0",
+  "description": "CLI for Abquanta media pipeline.",
+  "type": "module",
+  "bin": {
+    "abq-media": "src/cli.js"
+  },
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "echo 'build cli'",
+    "test": "echo 'test cli'",
+    "lint": "echo 'lint cli'",
+    "clean": "echo 'clean cli'"
+  }
+}

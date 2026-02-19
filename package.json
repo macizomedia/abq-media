@@ -1,0 +1,23 @@
+{
+  "name": "@abquanta/abq-media-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Monorepo for Abquanta media intelligence pipeline (YouTube -> transcript -> digest -> research prompt -> podcast/video).",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abquanta/abq-media-workspace.git"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run -ws build",
+    "test": "npm run -ws test",
+    "lint": "npm run -ws lint",
+    "clean": "npm run -ws clean"
+  }
+}

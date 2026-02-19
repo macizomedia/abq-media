@@ -1,0 +1,14 @@
+{
+  "name": "@abquanta/adapter-transcript",
+  "version": "0.1.0",
+  "description": "Transcript adapter abstraction (captions/ASR providers).",
+  "type": "module",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "echo 'build adapter-transcript'",
+    "test": "echo 'test adapter-transcript'",
+    "lint": "echo 'lint adapter-transcript'",
+    "clean": "echo 'clean adapter-transcript'"
+  }
+}
