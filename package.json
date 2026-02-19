@@ -18,6 +18,10 @@
     "build": "npm run -ws build",
     "test": "npm run -ws test",
     "lint": "npm run -ws lint",
-    "clean": "npm run -ws clean"
+    "clean": "npm run -ws clean",
+    "yt:doctor": "npm run yt:doctor -w @abquanta/pipeline-youtube-research-podcast",
+    "yt:prep": "npm run yt:prep -w @abquanta/pipeline-youtube-research-podcast",
+    "yt:latest": "npm run yt:latest -w @abquanta/pipeline-youtube-research-podcast",
+    "yt:podcast": "npm run yt:podcast -w @abquanta/pipeline-youtube-research-podcast"
   }
 }

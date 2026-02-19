@@ -1,6 +1,6 @@
 {
   "name": "@abquanta/pipeline-youtube-research-podcast",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "YouTube -> research -> podcast pipeline module",
   "type": "module",
   "bin": {
@@ -19,9 +19,13 @@
   "scripts": {
     "init": "node ./src/cli/init.js",
     "build": "echo 'build not configured yet'",
-    "test": "echo 'test not configured yet'",
+    "test": "node --test test/smoke.test.js",
     "lint": "echo 'lint not configured yet'",
-    "clean": "echo 'clean not configured yet'"
+    "clean": "echo 'clean not configured yet'",
+    "yt:doctor": "node ./src/cli.js doctor",
+    "yt:prep": "node ./src/cli.js prep",
+    "yt:latest": "node ./src/cli.js latest",
+    "yt:podcast": "node ./src/cli.js podcast"
   },
   "keywords": [
     "abquanta",

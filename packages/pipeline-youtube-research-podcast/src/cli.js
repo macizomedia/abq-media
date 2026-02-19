@@ -4,6 +4,27 @@ import path from 'node:path';
 import os from 'node:os';
 import { execSync } from 'node:child_process';
 
+// --- .env loader (native, no deps) ---
+(function loadDotenv() {
+  const envPath = path.resolve(process.cwd(), '.env');
+  try {
+    const content = fs.readFileSync(envPath, 'utf8');
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+      if (key && !(key in process.env)) {
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    // .env file not found or unreadable — that's fine
+  }
+})();
+
 function hasCmd(name) {
   try {
     execSync(`command -v ${name}`, { stdio: 'pipe' });
@@ -28,12 +49,31 @@ function nowStamp() {
 
 function readLocalConfig() {
   const p = path.resolve(process.cwd(), '.abq-module.json');
-  if (!fs.existsSync(p)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(p, 'utf8'));
-  } catch {
-    return null;
+  let config = null;
+  if (fs.existsSync(p)) {
+    try {
+      config = JSON.parse(fs.readFileSync(p, 'utf8'));
+    } catch {
+      // ignore parse errors
+    }
   }
+  if (!config) config = {};
+
+  // Fall back to env vars for API keys
+  if (!config.llmApiKey) {
+    const provider = (config.llmProvider || '').toLowerCase();
+    if (provider === 'openrouter') config.llmApiKey = process.env.OPENROUTER_API_KEY || '';
+    else if (provider === 'openai') config.llmApiKey = process.env.OPENAI_API_KEY || '';
+    else config.llmApiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || '';
+  }
+  if (!config.asrApiKey) {
+    const asrProv = (config.asrProvider || config.llmProvider || '').toLowerCase();
+    if (asrProv === 'openrouter') config.asrApiKey = process.env.OPENROUTER_API_KEY || '';
+    else if (asrProv === 'openai') config.asrApiKey = process.env.OPENAI_API_KEY || '';
+    else config.asrApiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || '';
+  }
+
+  return config;
 }
 
 function normalizeUrlInput(input) {
@@ -267,6 +307,9 @@ async function tryApiAsrTranscript(url, lang = 'es', config = null) {
 }
 
 async function fetchYouTubeCaptions(videoId, url, lang = 'es', config = null) {
+  const fallbackTrace = [];
+
+  // Step 1: YouTube captions API
   const langCandidates = [lang, 'es', 'en', 'en-US'];
   const endpoints = [];
   for (const l of langCandidates) {
@@ -274,28 +317,87 @@ async function fetchYouTubeCaptions(videoId, url, lang = 'es', config = null) {
     endpoints.push(`https://www.youtube.com/api/timedtext?v=${videoId}&lang=${encodeURIComponent(l)}`);
   }
 
-  for (const endpoint of endpoints) {
-    const res = await fetch(endpoint);
-    if (!res.ok) continue;
-    const xml = await res.text();
-    if (!xml || !xml.includes('<text')) continue;
-    const text = stripXml(xml);
-    if (text.length > 40) {
-      return { transcript: text, source: endpoint };
+  let captionsFailed = true;
+  let captionsReason = 'no captions found for any language candidate';
+  try {
+    for (const endpoint of endpoints) {
+      const res = await fetch(endpoint);
+      if (!res.ok) continue;
+      const xml = await res.text();
+      if (!xml || !xml.includes('<text')) continue;
+      const text = stripXml(xml);
+      if (text.length > 40) {
+        fallbackTrace.push({ step: 'youtube-captions', status: 'ok' });
+        return { transcript: text, source: endpoint };
+      }
     }
+  } catch (err) {
+    captionsReason = String(err?.message || err);
+  }
+  fallbackTrace.push({ step: 'youtube-captions', status: 'fail', reason: captionsReason });
+
+  // Step 2: yt-dlp subtitles
+  if (!hasCmd('yt-dlp')) {
+    fallbackTrace.push({ step: 'yt-dlp', status: 'skip', reason: 'not installed' });
+  } else {
+    let ytdlp = null;
+    try {
+      ytdlp = tryYtDlpTranscript(url, lang);
+    } catch (err) {
+      // tryYtDlpTranscript already swallows errors; this is extra safety
+    }
+    if (ytdlp) {
+      fallbackTrace.push({ step: 'yt-dlp', status: 'ok' });
+      return ytdlp;
+    }
+    fallbackTrace.push({ step: 'yt-dlp', status: 'fail', reason: 'no subtitle files produced' });
   }
 
-  const ytdlp = tryYtDlpTranscript(url, lang);
-  if (ytdlp) return ytdlp;
-
+  // Step 3: Local Whisper
   const whisperModel = config?.whisperModel || process.env.WHISPER_MODEL || 'base';
-  const whisper = tryWhisperTranscript(url, lang, whisperModel);
-  if (whisper) return whisper;
+  if (!hasCmd('whisper')) {
+    fallbackTrace.push({ step: 'whisper', status: 'skip', reason: 'not installed' });
+  } else {
+    let whisper = null;
+    try {
+      whisper = tryWhisperTranscript(url, lang, whisperModel);
+    } catch (err) {
+      // swallowed in tryWhisperTranscript; extra safety
+    }
+    if (whisper) {
+      fallbackTrace.push({ step: 'whisper', status: 'ok' });
+      return whisper;
+    }
+    fallbackTrace.push({ step: 'whisper', status: 'fail', reason: 'transcription produced no output' });
+  }
 
-  const apiAsr = await tryApiAsrTranscript(url, lang, config);
-  if (apiAsr) return apiAsr;
+  // Step 4: API ASR
+  const asrProvider = (config?.asrProvider || config?.llmProvider || '').toLowerCase();
+  const asrApiKey = config?.asrApiKey || config?.llmApiKey || '';
+  if (!asrProvider || !asrApiKey) {
+    fallbackTrace.push({ step: 'asr-api', status: 'skip', reason: 'no asrProvider or asrApiKey configured' });
+  } else {
+    let apiAsr = null;
+    try {
+      apiAsr = await tryApiAsrTranscript(url, lang, config);
+    } catch (err) {
+      // swallowed in tryApiAsrTranscript; extra safety
+    }
+    if (apiAsr) {
+      fallbackTrace.push({ step: 'asr-api', status: 'ok' });
+      return apiAsr;
+    }
+    fallbackTrace.push({ step: 'asr-api', status: 'fail', reason: 'API ASR returned no transcript' });
+  }
 
-  throw new Error('No transcript found: captions failed, yt-dlp subtitles failed, local whisper failed, and API ASR fallback failed.');
+  const traceLines = fallbackTrace
+    .map((entry, i) => {
+      const suffix = entry.reason ? ` (${entry.reason})` : '';
+      return `  ${i + 1}. ${entry.step}: ${entry.status.toUpperCase()}${suffix}`;
+    })
+    .join('\n');
+
+  throw new Error(`No transcript found. Fallback chain:\n${traceLines}`);
 }
 
 function sentenceSplit(text) {
@@ -551,9 +653,11 @@ async function maybeLLMRefineDigest({ transcript, talkingPoints, config }) {
       mode: `heuristic (provider ${provider} not supported)`
     };
   } catch (err) {
+    const reason = String(err?.message || err);
+    console.error(`[digest] LLM fallback: ${reason}`);
     return {
       digest: heuristicDigest(talkingPoints),
-      mode: `heuristic (llm fallback: ${String(err?.message || err)})`
+      mode: `heuristic (llm fallback: ${reason})`
     };
   }
 }

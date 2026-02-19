@@ -1,1 +1,5 @@
 .abq-module.json
+output/
+node_modules/
+.env
+*.local
