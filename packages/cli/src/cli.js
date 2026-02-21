@@ -87,6 +87,11 @@ function runCommand(cmd, opts = {}) {
   }
 }
 
+function hasCmd(name) {
+  const res = spawnSync('command', ['-v', name], { stdio: 'ignore' });
+  return res.status === 0;
+}
+
 function openInEditor(filePath) {
   const editor = process.env.EDITOR || 'nano';
   const res = spawnSync(editor, [filePath], { stdio: 'inherit' });
@@ -132,6 +137,52 @@ function resolveLatestPublishPromptFallback(cwd) {
   if (!runs.length) return null;
   const prompt = path.join(runs[0], 'podcast_script.md');
   return fs.existsSync(prompt) ? prompt : null;
+}
+
+function resolveLatestPublishDir(cwd) {
+  const outDir = path.resolve(cwd, 'output');
+  if (fs.existsSync(outDir)) {
+    const runs = fs.readdirSync(outDir)
+      .filter((d) => d.startsWith('publish-'))
+      .map((d) => path.join(outDir, d))
+      .filter((p) => fs.statSync(p).isDirectory())
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    if (runs.length) return runs[0];
+  }
+  const pipelineOut = path.resolve(cwd, 'packages/pipeline-youtube-research-podcast/output');
+  if (fs.existsSync(pipelineOut)) {
+    const runs = fs.readdirSync(pipelineOut)
+      .filter((d) => d.startsWith('publish-'))
+      .map((d) => path.join(pipelineOut, d))
+      .filter((p) => fs.statSync(p).isDirectory())
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    if (runs.length) return runs[0];
+  }
+  return null;
+}
+
+function resolveLatestPodcastMp3(cwd) {
+  const outDir = path.resolve(cwd, 'output');
+  if (!fs.existsSync(outDir)) return null;
+  const files = fs.readdirSync(outDir)
+    .filter((f) => f.startsWith('podcast-') && f.endsWith('.mp3'))
+    .map((f) => path.join(outDir, f))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  return files[0] || null;
+}
+
+function previewMarkdown(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return;
+  if (hasCmd('bat')) {
+    spawnSync('bat', ['--style=plain', filePath], { stdio: 'inherit' });
+    return;
+  }
+  if (hasCmd('glow')) {
+    spawnSync('glow', [filePath], { stdio: 'inherit' });
+    return;
+  }
+  const content = fs.readFileSync(filePath, 'utf8');
+  process.stdout.write(`\n${content}\n`);
 }
 
 async function cmdRun() {
@@ -229,6 +280,8 @@ async function cmdRun() {
 
   const promptPath = resolveLatestPrepPrompt(process.cwd());
   if (promptPath) {
+    prompts.log.info('Previewing research prompt...');
+    previewMarkdown(promptPath);
     const edit = await prompts.confirm({ message: 'Edit the research prompt before publish?', initialValue: false });
     if (prompts.isCancel(edit)) return prompts.cancel('Aborted.');
     if (edit) {
@@ -268,8 +321,10 @@ async function cmdRun() {
   }
 
   const latestPrompt = resolveLatestPrepPrompt(process.cwd());
-  const latestPodcast = resolveLatestPublishPrompt(process.cwd());
-  prompts.outro(`Done.\\nPrompt: ${latestPrompt || 'n/a'}\\nPodcast script: ${latestPodcast || 'n/a'}`);
+  const latestPublishDir = resolveLatestPublishDir(process.cwd());
+  const latestPodcastScript = resolveLatestPublishPromptFallback(process.cwd());
+  const latestMp3 = resolveLatestPodcastMp3(process.cwd());
+  prompts.outro(`Done.\\nPrompt: ${latestPrompt || 'n/a'}\\nPublish: ${latestPublishDir || 'n/a'}\\nPodcast script: ${latestPodcastScript || 'n/a'}\\nPodcast mp3: ${latestMp3 || 'n/a'}`);
 }
 
 const command = process.argv[2];
