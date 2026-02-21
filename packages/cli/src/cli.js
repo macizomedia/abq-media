@@ -119,6 +119,21 @@ function resolveLatestPublishPrompt(cwd) {
   return fs.existsSync(prompt) ? prompt : null;
 }
 
+function resolveLatestPublishPromptFallback(cwd) {
+  const primary = resolveLatestPublishPrompt(cwd);
+  if (primary) return primary;
+  const pipelineOut = path.resolve(cwd, 'packages/pipeline-youtube-research-podcast/output');
+  if (!fs.existsSync(pipelineOut)) return null;
+  const runs = fs.readdirSync(pipelineOut)
+    .filter((d) => d.startsWith('publish-'))
+    .map((d) => path.join(pipelineOut, d))
+    .filter((p) => fs.statSync(p).isDirectory())
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  if (!runs.length) return null;
+  const prompt = path.join(runs[0], 'podcast_script.md');
+  return fs.existsSync(prompt) ? prompt : null;
+}
+
 async function cmdRun() {
   prompts.intro('abq-media');
 
@@ -241,7 +256,11 @@ async function cmdRun() {
 
   if (renderAudio) {
     prompts.log.info('Rendering TTS...');
-    const tts = runCommand('npm run tts:render -- --latest', { cwd: process.cwd() });
+    const latestPodcast = resolveLatestPublishPromptFallback(process.cwd());
+    const ttsCmd = latestPodcast
+      ? `npm run tts:render -- --input "${latestPodcast}"`
+      : 'npm run tts:render -- --latest';
+    const tts = runCommand(ttsCmd, { cwd: process.cwd() });
     if (!tts.ok) {
       prompts.log.error(tts.error || 'TTS render failed');
       return prompts.cancel('Aborted.');
