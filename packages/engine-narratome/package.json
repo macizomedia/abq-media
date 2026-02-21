@@ -1,0 +1,37 @@
+{
+  "name": "@abquanta/engine-narratome",
+  "version": "0.1.0-alpha.1",
+  "description": "Narratome generation and rendering engine",
+  "type": "module",
+  "bin": {
+    "abq-narratome": "src/cli.js"
+  },
+  "license": "MIT",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE",
+    ".abq-module.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "narratome:generate": "node ./src/cli.js generate",
+    "narratome:render": "node ./src/cli.js render",
+    "narratome:run": "node ./src/cli.js run",
+    "narratome:doctor": "node ./src/cli.js doctor"
+  },
+  "keywords": [
+    "abquanta",
+    "narratome",
+    "story",
+    "video",
+    "tts"
+  ],
+  "author": "abquanta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abquanta/abq-media-workspace.git"
+  }
+}
