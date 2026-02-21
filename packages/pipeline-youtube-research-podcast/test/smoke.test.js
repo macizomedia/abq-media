@@ -40,3 +40,24 @@ test('latest returns a path after prep runs', () => {
   assert.ok(out.length > 0, 'Should return a path');
   assert.ok(fs.existsSync(out), 'Returned path should exist');
 });
+
+test('prep fails when audio file is missing', () => {
+  try {
+    execSync(`node ${CLI} prep --audio-file missing.mp3`, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    assert.fail('Expected prep to fail for missing audio file');
+  } catch (err) {
+    const stderr = String(err?.stderr || '');
+    assert.match(stderr, /Audio file not found/i);
+  }
+});
+
+test('prep with --use-asr fails without ASR config', () => {
+  const url = 'https://youtu.be/dQw4w9WgXcQ';
+  try {
+    execSync(`node ${CLI} prep --url ${url} --use-asr true`, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    assert.fail('Expected prep to fail when ASR is not configured');
+  } catch (err) {
+    const stderr = String(err?.stderr || '');
+    assert.match(stderr, /ASR not configured/i);
+  }
+});

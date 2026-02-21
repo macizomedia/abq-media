@@ -10,7 +10,7 @@
   "license": "MIT",
   "scripts": {
     "build": "echo 'build cli'",
-    "test": "echo 'test cli'",
+    "test": "node --test test/smoke.test.js",
     "lint": "echo 'lint cli'",
     "clean": "echo 'clean cli'"
   }
