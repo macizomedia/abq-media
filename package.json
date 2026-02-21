@@ -22,6 +22,9 @@
     "yt:doctor": "npm run yt:doctor -w @abquanta/pipeline-youtube-research-podcast",
     "yt:prep": "npm run yt:prep -w @abquanta/pipeline-youtube-research-podcast",
     "yt:latest": "npm run yt:latest -w @abquanta/pipeline-youtube-research-podcast",
-    "yt:podcast": "npm run yt:podcast -w @abquanta/pipeline-youtube-research-podcast"
+    "yt:podcast": "npm run yt:podcast -w @abquanta/pipeline-youtube-research-podcast",
+    "yt:publish": "npm run yt:publish -w @abquanta/pipeline-youtube-research-podcast",
+    "tts:render": "npm run tts:render -w @abquanta/adapter-elevenlabs-tts",
+    "tts:doctor": "npm run tts:doctor -w @abquanta/adapter-elevenlabs-tts"
   }
 }
