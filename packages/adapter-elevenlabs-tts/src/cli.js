@@ -146,14 +146,20 @@ function getDurationSeconds(filePath) {
 
 async function cmdRender() {
   const input = arg('--input');
+  const useLatest = process.argv.includes('--latest');
   const output = arg('--output');
 
-  if (!input) {
-    console.error('Usage: abq-el-tts render --input <podcast_script.md> [--output <podcast.mp3>]');
+  if (!input && !useLatest) {
+    console.error('Usage: abq-el-tts render --input <podcast_script.md> [--output <podcast.mp3>] [--latest]');
+    process.exit(1);
+  }
+  if (input && useLatest) {
+    console.error('Invalid flags: --input and --latest cannot be used together.');
     process.exit(1);
   }
 
-  const inputPath = path.resolve(process.cwd(), input);
+  const resolvedInput = input || resolveLatestPublishPrompt();
+  const inputPath = path.resolve(process.cwd(), resolvedInput);
   if (!fs.existsSync(inputPath)) {
     console.error(`Input file not found: ${inputPath}`);
     process.exit(1);
@@ -240,6 +246,34 @@ async function cmdRender() {
   }
 }
 
+function resolveLatestPublishPrompt() {
+  const outDir = path.resolve(process.cwd(), 'output');
+  if (!fs.existsSync(outDir)) {
+    console.error('No output directory found yet.');
+    process.exit(1);
+  }
+
+  const runs = fs.readdirSync(outDir)
+    .filter((d) => d.startsWith('publish-'))
+    .map((d) => path.join(outDir, d))
+    .filter((p) => fs.statSync(p).isDirectory())
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+
+  if (!runs.length) {
+    console.error('No publish runs found in output/.');
+    process.exit(1);
+  }
+
+  const latest = runs[0];
+  const target = path.join(latest, 'podcast_script.md');
+  if (!fs.existsSync(target)) {
+    console.error(`File not found: ${target}`);
+    process.exit(1);
+  }
+
+  return target;
+}
+
 async function cmdDoctor() {
   const config = readLocalConfig();
   const hasFfmpeg = hasCmd('ffmpeg');
@@ -295,7 +329,7 @@ const command = process.argv[2];
       break;
     default:
       console.log('abq-el-tts commands:');
-      console.log('  render --input <podcast_script.md> [--output <podcast.mp3>]');
+      console.log('  render --input <podcast_script.md> [--output <podcast.mp3>] [--latest]');
       console.log('  doctor');
   }
 })().catch((err) => {

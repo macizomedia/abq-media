@@ -35,3 +35,13 @@ test('render fails when input file is missing', () => {
     assert.match(stderr, /Input file not found/i);
   }
 });
+
+test('render --latest fails when no publish runs exist', () => {
+  try {
+    execSync(`node ${CLI} render --latest`, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    assert.fail('Expected render --latest to fail without publish outputs');
+  } catch (err) {
+    const stderr = String(err?.stderr || '');
+    assert.match(stderr, /(No publish runs found|No output directory found)/i);
+  }
+});
