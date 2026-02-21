@@ -273,7 +273,6 @@ function resolveLatestPublishPrompt() {
 
   return target;
 }
-
 async function cmdDoctor() {
   const config = readLocalConfig();
   const hasFfmpeg = hasCmd('ffmpeg');
