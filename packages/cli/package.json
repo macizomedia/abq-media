@@ -9,6 +9,7 @@
   "main": "src/index.js",
   "license": "MIT",
   "scripts": {
+    "init": "node ./src/cli.js init",
     "build": "echo 'build cli'",
     "test": "node --test test/smoke.test.js",
     "lint": "echo 'lint cli'",
