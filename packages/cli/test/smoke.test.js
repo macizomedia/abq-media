@@ -20,3 +20,11 @@ test('init writes .abq-module.json in non-interactive mode', () => {
   assert.equal(json.lang, 'en');
   assert.equal(json.timezone, 'UTC');
 });
+
+test('init writes to custom path when --path is provided', () => {
+  const target = path.join(cwd, 'nested');
+  fs.mkdirSync(target, { recursive: true });
+  execSync(`node ${CLI} init --path ${target} --non-interactive --llm-provider openai --llm-key test-key --asr-provider openai --asr-key asr-key --lang en --timezone UTC`, { cwd, encoding: 'utf8' });
+  const configPath = path.join(target, '.abq-module.json');
+  assert.ok(fs.existsSync(configPath));
+});

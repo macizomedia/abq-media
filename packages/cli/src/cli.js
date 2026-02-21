@@ -26,7 +26,9 @@ function ask(question, fallback = '') {
 async function cmdInit() {
   const nonInteractive = hasFlag('--non-interactive');
   const force = hasFlag('--force');
-  const configPath = path.resolve(process.cwd(), '.abq-module.json');
+  const targetDir = arg('--path');
+  const baseDir = targetDir ? path.resolve(process.cwd(), targetDir) : process.cwd();
+  const configPath = path.resolve(baseDir, '.abq-module.json');
 
   if (fs.existsSync(configPath) && !force) {
     console.error(`Config already exists: ${configPath}. Use --force to overwrite.`);
@@ -77,7 +79,7 @@ const command = process.argv[2];
       break;
     default:
       console.log('abq-media commands:');
-      console.log('  init [--llm-provider openai|openrouter] [--llm-key <key>] [--asr-provider openai|openrouter] [--asr-key <key>] [--lang es] [--timezone UTC] [--force] [--non-interactive]');
+      console.log('  init [--path <dir>] [--llm-provider openai|openrouter] [--llm-key <key>] [--asr-provider openai|openrouter] [--asr-key <key>] [--lang es] [--timezone UTC] [--force] [--non-interactive]');
   }
 })().catch((err) => {
   console.error(err?.message || err);
