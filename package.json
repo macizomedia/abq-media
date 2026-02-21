@@ -22,6 +22,12 @@
     "yt:doctor": "npm run yt:doctor -w @abquanta/pipeline-youtube-research-podcast",
     "yt:prep": "npm run yt:prep -w @abquanta/pipeline-youtube-research-podcast",
     "yt:latest": "npm run yt:latest -w @abquanta/pipeline-youtube-research-podcast",
-    "yt:podcast": "npm run yt:podcast -w @abquanta/pipeline-youtube-research-podcast"
+    "yt:podcast": "npm run yt:podcast -w @abquanta/pipeline-youtube-research-podcast",
+    "tts:render": "npm run tts:render -w @abquanta/adapter-elevenlabs-tts",
+    "tts:doctor": "npm run tts:doctor -w @abquanta/adapter-elevenlabs-tts",
+    "narratome:generate": "npm run narratome:generate -w @abquanta/engine-narratome",
+    "narratome:render": "npm run narratome:render -w @abquanta/engine-narratome",
+    "narratome:run": "npm run narratome:run -w @abquanta/engine-narratome",
+    "narratome:doctor": "npm run narratome:doctor -w @abquanta/engine-narratome"
   }
 }
