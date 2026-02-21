@@ -173,15 +173,40 @@ async function cmdRun() {
   });
   if (prompts.isCancel(lang)) return prompts.cancel('Aborted.');
 
-  const captions = await prompts.confirm({ message: 'Use captions if available?', initialValue: true });
-  if (prompts.isCancel(captions)) return prompts.cancel('Aborted.');
-
-  const asr = await prompts.confirm({ message: 'If no captions, use ASR?', initialValue: true });
-  if (prompts.isCancel(asr)) return prompts.cancel('Aborted.');
+  let captions = true;
+  let asr = true;
+  if (inputType === 'youtube') {
+    captions = await prompts.confirm({ message: 'Try captions first?', initialValue: true });
+    if (prompts.isCancel(captions)) return prompts.cancel('Aborted.');
+    asr = await prompts.confirm({ message: 'If no captions, use ASR?', initialValue: true });
+    if (prompts.isCancel(asr)) return prompts.cancel('Aborted.');
+  }
 
   prompts.log.info('Running prep...');
-  const prepCmd = `npm run yt:prep -- ${inputArg} --lang ${lang} ${captions ? '--use-captions' : ''} ${asr ? '' : '--use-captions'}`.trim();
-  const prep = runCommand(prepCmd, { cwd: process.cwd() });
+  let prepCmd = `npm run yt:prep -- ${inputArg} --lang ${lang}`.trim();
+  if (inputType === 'youtube' && captions && !asr) {
+    prepCmd = `${prepCmd} --use-captions`;
+  }
+  if (inputType === 'youtube' && !captions && asr) {
+    prepCmd = `${prepCmd} --use-asr`;
+  }
+  if (inputType === 'youtube' && !captions && !asr) {
+    prompts.log.error('You must choose captions or ASR for YouTube input.');
+    return prompts.cancel('Aborted.');
+  }
+
+  let prep = runCommand(prepCmd, { cwd: process.cwd() });
+  if (!prep.ok && inputType === 'youtube' && captions && asr) {
+    const wantsAsr = await prompts.confirm({
+      message: 'No captions found. Use ASR instead? (may consume credits)',
+      initialValue: true
+    });
+    if (prompts.isCancel(wantsAsr) || !wantsAsr) {
+      prompts.log.error(prep.error || 'Prep failed');
+      return prompts.cancel('Aborted.');
+    }
+    prep = runCommand(`${`npm run yt:prep -- ${inputArg} --lang ${lang}`} --use-asr`, { cwd: process.cwd() });
+  }
   if (!prep.ok) {
     prompts.log.error(prep.error || 'Prep failed');
     return prompts.cancel('Aborted.');
