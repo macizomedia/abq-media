@@ -516,11 +516,11 @@ function buildLlmMessages(transcript) {
   ];
 }
 
-async function callOpenAICompatible({ baseUrl, apiKey, model, transcript }) {
+async function callOpenAICompatible({ baseUrl, apiKey, model, transcript, messages }) {
   const body = {
     model,
     temperature: 0.2,
-    messages: buildLlmMessages(transcript)
+    messages: messages || buildLlmMessages(transcript)
   };
 
   const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
@@ -543,11 +543,11 @@ async function callOpenAICompatible({ baseUrl, apiKey, model, transcript }) {
   return text;
 }
 
-async function callOpenRouter({ apiKey, model, transcript }) {
+async function callOpenRouter({ apiKey, model, transcript, messages }) {
   const body = {
     model,
     temperature: 0.2,
-    messages: buildLlmMessages(transcript)
+    messages: messages || buildLlmMessages(transcript)
   };
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -660,6 +660,83 @@ async function maybeLLMRefineDigest({ transcript, talkingPoints, config }) {
       mode: `heuristic (llm fallback: ${reason})`
     };
   }
+}
+
+function buildPublishMessages({ researchPrompt, outputType, lang }) {
+  const intro = `You are a senior content editor and scriptwriter. Output language: ${lang}.`;
+  const common = 'Use the research prompt as the single source of truth. Do not invent facts. Avoid fluff.';
+  const variants = {
+    podcast_script: [
+      `You are a podcast scriptwriter for Abquanta, a strategic intelligence`,
+      `platform covering Venezuela and geopolitics. Write a 2-host conversational`,
+      `dialogue podcast script in ${lang} using this structure:`,
+      '',
+      '- Two hosts: HOST_A (lead analyst, authoritative) and HOST_B (curious',
+      '  co-host who asks the right questions)',
+      '- Format every line as: HOST_A: [text] or HOST_B: [text]',
+      '- No stage directions, no headers, no markdown — pure dialogue only',
+      '- Length: ~2000 words (approx 12-15 minutes of audio)',
+      '- Open with a hook that would stop someone mid-scroll',
+      '- Hosts should challenge each other\'s points naturally',
+      '- Close with 3 clear actionable takeaways delivered conversationally',
+      '- Tone: serious but engaging — like a smart radio show, not a lecture'
+    ].join(' '),
+    article: [
+      intro,
+      `Write a Substack-ready long-form article in ${lang}.`,
+      'Structure: SEO headline + subtitle, lead paragraph (hook), 4–5 sections with subheaders, closing CTA: "Subscribe for more Abquanta intelligence".',
+      'Target length: 800–1200 words.',
+      'Output markdown with headline, subtitle, and section headers.'
+    ].join(' '),
+    reel_script: [
+      intro,
+      `Write a 60-second short-form video script in ${lang}.`,
+      'Structure: Hook line in first 3 seconds, 3 key points (10 seconds each), call to action (Substack link).',
+      'Format each beat as [VISUAL] then [NARRATION].',
+      'Keep lines tight and timed for spoken delivery.'
+    ].join(' '),
+    social_posts: [
+      intro,
+      `Produce social content in ${lang} with three parts:`,
+      '1) X/Twitter thread (8–10 tweets).',
+      '2) LinkedIn post (~200 words).',
+      '3) Instagram caption with 5 hashtags.',
+      'Separate each part with clear markdown headings.'
+    ].join(' ')
+  };
+
+  const system = `${variants[outputType] || intro} ${common}`.trim();
+  return [
+    { role: 'system', content: system },
+    { role: 'user', content: `Research prompt:\n\n${researchPrompt}` }
+  ];
+}
+
+async function callPublishLLM({ researchPrompt, outputType, lang, config }) {
+  const provider = String(config?.llmProvider || '').toLowerCase();
+  const model = config?.publishModel || config?.model || (provider === 'openrouter' ? 'openrouter/auto' : 'gpt-4o-mini');
+  const messages = buildPublishMessages({ researchPrompt, outputType, lang });
+
+  if (provider === 'openai') {
+    if (!config?.llmApiKey) throw new Error('Missing llmApiKey for openai');
+    return callOpenAICompatible({
+      baseUrl: config?.baseUrl || 'https://api.openai.com/v1',
+      apiKey: config.llmApiKey,
+      model,
+      messages
+    });
+  }
+
+  if (provider === 'openrouter') {
+    if (!config?.llmApiKey) throw new Error('Missing llmApiKey for openrouter');
+    return callOpenRouter({
+      apiKey: config.llmApiKey,
+      model,
+      messages
+    });
+  }
+
+  throw new Error(`Unsupported llmProvider: ${provider || 'none'}`);
 }
 
 function cmdInit() {
@@ -822,6 +899,88 @@ async function cmdPrep() {
   console.log(`Prep artifacts created at: ${out}`);
 }
 
+async function cmdPublish() {
+  const input = arg('--input');
+  const lang = arg('--lang', 'es');
+  if (!input) {
+    console.error('Usage: abq-yt-rp publish --input <path/to/deep_research_prompt.md> [--lang es]');
+    process.exit(1);
+  }
+
+  const inputPath = path.resolve(process.cwd(), input);
+  if (!fs.existsSync(inputPath)) {
+    console.error(`Input file not found: ${inputPath}`);
+    process.exit(1);
+  }
+
+  const config = readLocalConfig();
+  const provider = String(config?.llmProvider || '').toLowerCase();
+  if (!provider) {
+    console.error('LLM provider not configured. Set llmProvider in .abq-module.json.');
+    process.exit(1);
+  }
+  if (!config?.llmApiKey) {
+    console.error('LLM API key not configured. Set llmApiKey in .abq-module.json or env.');
+    process.exit(1);
+  }
+  if (provider !== 'openai' && provider !== 'openrouter') {
+    console.error(`Unsupported llmProvider for publish: ${provider}`);
+    process.exit(1);
+  }
+
+  const researchPrompt = fs.readFileSync(inputPath, 'utf8').trim();
+  if (!researchPrompt) {
+    console.error('Input file is empty.');
+    process.exit(1);
+  }
+
+  const out = path.resolve(process.cwd(), 'output', `publish-${nowStamp()}`);
+  ensureDir(out);
+
+  const model = config?.publishModel || config?.model || (provider === 'openrouter' ? 'openrouter/auto' : 'gpt-4o-mini');
+  const metadata = {
+    stage: 'publish',
+    inputFile: inputPath,
+    lang,
+    model,
+    createdAt: new Date().toISOString(),
+    outputs: {
+      podcast_script: 'error: not generated',
+      article: 'error: not generated',
+      reel_script: 'error: not generated',
+      social_posts: 'error: not generated'
+    }
+  };
+
+  const jobs = [
+    { type: 'podcast_script', file: 'podcast_script.md' },
+    { type: 'article', file: 'article.md' },
+    { type: 'reel_script', file: 'reel_script.md' },
+    { type: 'social_posts', file: 'social_posts.md' }
+  ];
+
+  for (const job of jobs) {
+    try {
+      const text = await callPublishLLM({
+        researchPrompt,
+        outputType: job.type,
+        lang,
+        config
+      });
+      fs.writeFileSync(path.join(out, job.file), text.trim() + '\n');
+      metadata.outputs[job.type] = 'ok';
+      console.log(`[publish] ${job.type}: ok`);
+    } catch (err) {
+      const reason = String(err?.message || err);
+      metadata.outputs[job.type] = `error: ${reason}`;
+      console.error(`[publish] ${job.type}: ${reason}`);
+    }
+  }
+
+  fs.writeFileSync(path.join(out, 'metadata.json'), JSON.stringify(metadata, null, 2));
+  console.log(`Publish artifacts created at: ${out}`);
+}
+
 function cmdPodcast() {
   const input = arg('--input');
   const lang = arg('--lang', 'es');
@@ -888,6 +1047,9 @@ const command = process.argv[2];
     case 'prep':
       await cmdPrep();
       break;
+    case 'publish':
+      await cmdPublish();
+      break;
     case 'podcast':
       cmdPodcast();
       break;
@@ -903,6 +1065,7 @@ const command = process.argv[2];
       console.log('  doctor');
       console.log('  latest [--open prompt|digest|transcript|metadata]');
       console.log('  prep (--url <youtube-url> | --transcript-file <path> | --text "..." | --text-file <path>) [--lang es]');
+      console.log('  publish --input <path/to/deep_research_prompt.md> [--lang es]');
       console.log('  podcast --input <research.md> [--lang es]');
   }
 })().catch((err) => {

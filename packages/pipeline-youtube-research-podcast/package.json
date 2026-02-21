@@ -25,7 +25,8 @@
     "yt:doctor": "node ./src/cli.js doctor",
     "yt:prep": "node ./src/cli.js prep",
     "yt:latest": "node ./src/cli.js latest",
-    "yt:podcast": "node ./src/cli.js podcast"
+    "yt:podcast": "node ./src/cli.js podcast",
+    "yt:publish": "node ./src/cli.js publish"
   },
   "keywords": [
     "abquanta",
