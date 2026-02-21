@@ -1065,12 +1065,14 @@ async function cmdPrep() {
 async function cmdPublish() {
   const input = arg('--input');
   const lang = arg('--lang', 'es');
-  if (!input) {
-    console.error('Usage: abq-yt-rp publish --input <path/to/deep_research_prompt.md> [--lang es]');
+  const useLatest = process.argv.includes('--latest');
+  if (!input && !useLatest) {
+    console.error('Usage: abq-yt-rp publish --input <path/to/deep_research_prompt.md> [--lang es] [--latest]');
     process.exit(1);
   }
 
-  const inputPath = path.resolve(process.cwd(), input);
+  const resolvedInput = input || resolveLatestPrepPath('prompt');
+  const inputPath = path.resolve(process.cwd(), resolvedInput);
   if (!fs.existsSync(inputPath)) {
     console.error(`Input file not found: ${inputPath}`);
     process.exit(1);
@@ -1156,6 +1158,10 @@ function cmdPodcast() {
 
 function cmdLatest() {
   const open = (arg('--open') || '').toLowerCase();
+  console.log(resolveLatestPrepPath(open || null));
+}
+
+function resolveLatestPrepPath(open = null) {
   const outDir = path.resolve(process.cwd(), 'output');
   if (!fs.existsSync(outDir)) {
     console.error('No output directory found yet.');
@@ -1174,10 +1180,7 @@ function cmdLatest() {
   }
 
   const latest = runs[0];
-  if (!open) {
-    console.log(latest);
-    return;
-  }
+  if (!open) return latest;
 
   const map = {
     prompt: 'deep_research_prompt.md',
@@ -1198,7 +1201,7 @@ function cmdLatest() {
     process.exit(1);
   }
 
-  console.log(target);
+  return target;
 }
 
 const command = process.argv[2];
@@ -1228,7 +1231,7 @@ const command = process.argv[2];
       console.log('  doctor');
       console.log('  latest [--open prompt|digest|transcript|metadata]');
       console.log('  prep (--url <youtube-url> | --audio-file <path> | --transcript-file <path> | --text "..." | --text-file <path>) [--lang es] [--use-captions] [--use-asr]');
-      console.log('  publish --input <path/to/deep_research_prompt.md> [--lang es]');
+      console.log('  publish --input <path/to/deep_research_prompt.md> [--lang es] [--latest]');
       console.log('  podcast --input <research.md> [--lang es]');
   }
 })().catch((err) => {

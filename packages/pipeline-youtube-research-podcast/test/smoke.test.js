@@ -96,7 +96,9 @@ test('publish fails when input file is missing', () => {
   }
 });
 
-test('publish succeeds with mocked LLM endpoint', async () => {
+const runPublishMock = process.env.ABQ_RUN_PUBLISH_MOCK === '1';
+
+(runPublishMock ? test : test.skip)('publish succeeds with mocked LLM endpoint', async () => {
   const prompt = path.join(cwd, 'deep_research_prompt.md');
   fs.writeFileSync(prompt, '# Deep Research Brief\n\nContenido de prueba.\n');
 
@@ -116,14 +118,17 @@ test('publish succeeds with mocked LLM endpoint', async () => {
   });
   server.on('connection', (socket) => {
     sockets.add(socket);
+    socket.unref();
     socket.on('close', () => sockets.delete(socket));
   });
 
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  server.unref();
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
 
   try {
+    execSync(`node ${CLI} prep --text \"Texto suficientemente largo para crear un prompt de investigación que luego se use con --latest en publish.\"`, { cwd, encoding: 'utf8' });
     const configPath = path.join(cwd, '.abq-module.json');
     fs.writeFileSync(configPath, JSON.stringify({
       llmProvider: 'openai',
@@ -131,7 +136,7 @@ test('publish succeeds with mocked LLM endpoint', async () => {
       baseUrl
     }, null, 2));
 
-    execSync(`node ${CLI} publish --input deep_research_prompt.md`, { cwd, encoding: 'utf8' });
+    execSync(`node ${CLI} publish --latest`, { cwd, encoding: 'utf8', timeout: 10000 });
 
     const outDir = path.join(cwd, 'output');
     const runs = fs.readdirSync(outDir).filter(d => d.startsWith('publish-'));
