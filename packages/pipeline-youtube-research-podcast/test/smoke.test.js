@@ -61,3 +61,14 @@ test('prep with --use-asr fails without ASR config', () => {
     assert.match(stderr, /ASR not configured/i);
   }
 });
+
+test('prep rejects conflicting flags', () => {
+  const url = 'https://youtu.be/dQw4w9WgXcQ';
+  try {
+    execSync(`node ${CLI} prep --url ${url} --use-asr true --use-captions true`, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    assert.fail('Expected prep to fail for conflicting flags');
+  } catch (err) {
+    const stderr = String(err?.stderr || '');
+    assert.match(stderr, /cannot be used together/i);
+  }
+});

@@ -204,57 +204,29 @@ async function tryApiAsrTranscript(url, lang = 'es', config = null) {
       }
     }
 
-    const audioBytes = fs.readFileSync(audioPath);
-    const uploadName = path.basename(audioPath);
-
-    const form = new FormData();
-    form.append('model', asrModel);
-    form.append('language', lang);
-    form.append('response_format', 'json');
-    form.append('file', new Blob([audioBytes]), uploadName);
-
-    if (asrProvider === 'openai') {
-      const baseUrl = (config?.asrBaseUrl || config?.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/audio/transcriptions`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${asrApiKey}` },
-        body: form
-      });
-      if (!res.ok) {
-        if (process.env.ABQ_DEBUG === '1') {
-          const t = await res.text();
-          console.error(`[asr-openai] HTTP ${res.status}: ${t.slice(0, 300)}`);
-        }
-        return null;
-      }
-      const json = await res.json();
-      const transcript = (json?.text || '').trim();
-      if (transcript.length < 40) return null;
-      return { transcript, source: `asr-openai:${asrModel}` };
+    const result = await asrRequest({
+      provider: asrProvider,
+      apiKey: asrApiKey,
+      model: asrModel,
+      lang,
+      audioPath,
+      config
+    });
+    if (result.ok) {
+      return { transcript: result.text, source: `${result.provider}:${asrModel}` };
     }
 
-    if (asrProvider === 'openrouter') {
-      const baseUrl = (config?.asrBaseUrl || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/audio/transcriptions`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${asrApiKey}`,
-          'HTTP-Referer': 'https://github.com/abquanta/pipeline-youtube-research-podcast',
-          'X-Title': 'abq-yt-rp'
-        },
-        body: form
+    if (result.inputTooLarge) {
+      const chunked = await asrTranscribeInChunks({
+        provider: asrProvider,
+        apiKey: asrApiKey,
+        model: asrModel,
+        lang,
+        audioPath,
+        tmpDir: tmp,
+        config
       });
-      if (!res.ok) {
-        if (process.env.ABQ_DEBUG === '1') {
-          const t = await res.text();
-          console.error(`[asr-openrouter] HTTP ${res.status}: ${t.slice(0, 300)}`);
-        }
-        return null;
-      }
-      const json = await res.json();
-      const transcript = (json?.text || '').trim();
-      if (transcript.length < 40) return null;
-      return { transcript, source: `asr-openrouter:${asrModel}` };
+      if (chunked) return { transcript: chunked, source: `${asrProvider}:${asrModel}+chunked` };
     }
 
     return null;
@@ -270,6 +242,96 @@ async function tryApiAsrTranscript(url, lang = 'es', config = null) {
       // ignore
     }
   }
+}
+
+function isInputTooLargeError(text) {
+  const t = String(text || '').toLowerCase();
+  return t.includes('input_too_large') || t.includes('too large for this model');
+}
+
+async function asrRequest({ provider, apiKey, model, lang, audioPath, config }) {
+  const audioBytes = fs.readFileSync(audioPath);
+  const uploadName = path.basename(audioPath);
+
+  const form = new FormData();
+  form.append('model', model);
+  form.append('language', lang);
+  form.append('response_format', 'json');
+  form.append('file', new Blob([audioBytes]), uploadName);
+
+  if (provider === 'openai') {
+    const baseUrl = (config?.asrBaseUrl || config?.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
+    const res = await fetch(`${baseUrl}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}` },
+      body: form
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      if (process.env.ABQ_DEBUG === '1') {
+        console.error(`[asr-openai] HTTP ${res.status}: ${t.slice(0, 300)}`);
+      }
+      return { ok: false, inputTooLarge: isInputTooLargeError(t), provider: 'asr-openai' };
+    }
+    const json = await res.json();
+    const transcript = (json?.text || '').trim();
+    if (transcript.length < 40) return { ok: false, inputTooLarge: false, provider: 'asr-openai' };
+    return { ok: true, text: transcript, provider: 'asr-openai' };
+  }
+
+  if (provider === 'openrouter') {
+    const baseUrl = (config?.asrBaseUrl || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+    const res = await fetch(`${baseUrl}/audio/transcriptions`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://github.com/abquanta/pipeline-youtube-research-podcast',
+        'X-Title': 'abq-yt-rp'
+      },
+      body: form
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      if (process.env.ABQ_DEBUG === '1') {
+        console.error(`[asr-openrouter] HTTP ${res.status}: ${t.slice(0, 300)}`);
+      }
+      return { ok: false, inputTooLarge: isInputTooLargeError(t), provider: 'asr-openrouter' };
+    }
+    const json = await res.json();
+    const transcript = (json?.text || '').trim();
+    if (transcript.length < 40) return { ok: false, inputTooLarge: false, provider: 'asr-openrouter' };
+    return { ok: true, text: transcript, provider: 'asr-openrouter' };
+  }
+
+  return { ok: false, inputTooLarge: false, provider: 'asr-unknown' };
+}
+
+function splitAudioIntoChunks({ audioPath, tmpDir, segmentSeconds }) {
+  if (!hasCmd('ffmpeg')) return [];
+  const pattern = path.join(tmpDir, 'chunk-%03d.mp3');
+  execSync(
+    `ffmpeg -y -i \"${audioPath}\" -f segment -segment_time ${segmentSeconds} -c copy -reset_timestamps 1 \"${pattern}\"`,
+    { stdio: 'pipe' }
+  );
+  const files = fs.readdirSync(tmpDir)
+    .filter((f) => f.startsWith('chunk-') && f.endsWith('.mp3'))
+    .map((f) => path.join(tmpDir, f))
+    .sort();
+  return files;
+}
+
+async function asrTranscribeInChunks({ provider, apiKey, model, lang, audioPath, tmpDir, config }) {
+  if (!hasCmd('ffmpeg')) return null;
+  const chunks = splitAudioIntoChunks({ audioPath, tmpDir, segmentSeconds: 600 });
+  if (!chunks.length) return null;
+
+  const parts = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const result = await asrRequest({ provider, apiKey, model, lang, audioPath: chunks[i], config });
+    if (!result.ok || !result.text) return null;
+    parts.push(result.text.trim());
+  }
+  return parts.join('\n\n');
 }
 
 async function tryApiAsrTranscriptFromFile(filePath, lang = 'es', config = null) {
@@ -298,57 +360,29 @@ async function tryApiAsrTranscriptFromFile(filePath, lang = 'es', config = null)
       }
     }
 
-    const audioBytes = fs.readFileSync(audioPath);
-    const uploadName = path.basename(audioPath);
-
-    const form = new FormData();
-    form.append('model', asrModel);
-    form.append('language', lang);
-    form.append('response_format', 'json');
-    form.append('file', new Blob([audioBytes]), uploadName);
-
-    if (asrProvider === 'openai') {
-      const baseUrl = (config?.asrBaseUrl || config?.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/audio/transcriptions`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${asrApiKey}` },
-        body: form
-      });
-      if (!res.ok) {
-        if (process.env.ABQ_DEBUG === '1') {
-          const t = await res.text();
-          console.error(`[asr-openai] HTTP ${res.status}: ${t.slice(0, 300)}`);
-        }
-        return null;
-      }
-      const json = await res.json();
-      const transcript = (json?.text || '').trim();
-      if (transcript.length < 40) return null;
-      return { transcript, source: `asr-openai:${asrModel}` };
+    const result = await asrRequest({
+      provider: asrProvider,
+      apiKey: asrApiKey,
+      model: asrModel,
+      lang,
+      audioPath,
+      config
+    });
+    if (result.ok) {
+      return { transcript: result.text, source: `${result.provider}:${asrModel}` };
     }
 
-    if (asrProvider === 'openrouter') {
-      const baseUrl = (config?.asrBaseUrl || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/audio/transcriptions`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${asrApiKey}`,
-          'HTTP-Referer': 'https://github.com/abquanta/pipeline-youtube-research-podcast',
-          'X-Title': 'abq-yt-rp'
-        },
-        body: form
+    if (result.inputTooLarge) {
+      const chunked = await asrTranscribeInChunks({
+        provider: asrProvider,
+        apiKey: asrApiKey,
+        model: asrModel,
+        lang,
+        audioPath,
+        tmpDir: tmp,
+        config
       });
-      if (!res.ok) {
-        if (process.env.ABQ_DEBUG === '1') {
-          const t = await res.text();
-          console.error(`[asr-openrouter] HTTP ${res.status}: ${t.slice(0, 300)}`);
-        }
-        return null;
-      }
-      const json = await res.json();
-      const transcript = (json?.text || '').trim();
-      if (transcript.length < 40) return null;
-      return { transcript, source: `asr-openrouter:${asrModel}` };
+      if (chunked) return { transcript: chunked, source: `${asrProvider}:${asrModel}+chunked` };
     }
 
     return null;
