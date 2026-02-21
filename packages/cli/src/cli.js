@@ -25,7 +25,7 @@ function ask(question, fallback = '') {
 
 async function cmdInit() {
   const nonInteractive = hasFlag('--non-interactive');
-  const force = hasFlag('--force');
+  const force = hasFlag('--force') || hasFlag('--overwrite');
   const targetDir = arg('--path');
   const baseDir = targetDir ? path.resolve(process.cwd(), targetDir) : process.cwd();
   const configPath = path.resolve(baseDir, '.abq-module.json');
@@ -41,6 +41,7 @@ async function cmdInit() {
   let asrApiKey = arg('--asr-key');
   let lang = arg('--lang', 'es');
   let timezone = arg('--timezone', 'UTC');
+  let asrModel = arg('--asr-model', 'whisper-1');
 
   if (!nonInteractive && process.stdin.isTTY) {
     if (!llmProvider) llmProvider = await ask('LLM provider (openai|openrouter) [openai]: ', 'openai');
@@ -49,6 +50,7 @@ async function cmdInit() {
     if (!asrApiKey) asrApiKey = await ask('ASR API key (leave blank to skip): ');
     if (!lang) lang = await ask('Default language [es]: ', 'es');
     if (!timezone) timezone = await ask('Timezone [UTC]: ', 'UTC');
+    if (!asrModel) asrModel = await ask('ASR model [whisper-1]: ', 'whisper-1');
   } else {
     if (!llmProvider && !nonInteractive) llmProvider = 'openai';
   }
@@ -63,6 +65,7 @@ async function cmdInit() {
     llmApiKey: llmApiKey || '',
     asrProvider: asrProvider || llmProvider || '',
     asrApiKey: asrApiKey || '',
+    asrModel: asrModel || 'whisper-1',
     lang,
     timezone
   };
@@ -79,7 +82,7 @@ const command = process.argv[2];
       break;
     default:
       console.log('abq-media commands:');
-      console.log('  init [--path <dir>] [--llm-provider openai|openrouter] [--llm-key <key>] [--asr-provider openai|openrouter] [--asr-key <key>] [--lang es] [--timezone UTC] [--force] [--non-interactive]');
+      console.log('  init [--path <dir>] [--llm-provider openai|openrouter] [--llm-key <key>] [--asr-provider openai|openrouter] [--asr-key <key>] [--asr-model whisper-1] [--lang es] [--timezone UTC] [--force|--overwrite] [--non-interactive]');
   }
 })().catch((err) => {
   console.error(err?.message || err);
