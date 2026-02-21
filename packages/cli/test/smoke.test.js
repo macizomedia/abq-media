@@ -28,3 +28,8 @@ test('init writes to custom path when --path is provided', () => {
   const configPath = path.join(target, '.abq-module.json');
   assert.ok(fs.existsSync(configPath));
 });
+
+test('run command exists', () => {
+  const out = execSync(`node ${CLI}`, { cwd, encoding: 'utf8' });
+  assert.match(out, /run/);
+});
