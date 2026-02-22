@@ -192,6 +192,27 @@ async function cmdRender() {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'abq-tts-'));
   const audioFiles = [];
   let lastApiError = null;
+  let bailed = false;
+
+  function isFatalApiError(err) {
+    const status = err?.status;
+    if (status === 401 || status === 403) return true;
+    const msg = String(err?.message || '');
+    return msg.includes('quota_exceeded') || msg.includes('unauthorized') || msg.includes('invalid_api_key');
+  }
+
+  function cleanApiErrorMessage(err) {
+    try {
+      const raw = String(err?.message || '').replace(/^ElevenLabs HTTP \d+:\s*/, '');
+      const parsed = JSON.parse(raw);
+      const detail = parsed?.detail;
+      if (detail?.status === 'quota_exceeded') {
+        return 'ElevenLabs quota exceeded — you have no credits remaining. Upgrade at elevenlabs.io/subscription.';
+      }
+      if (detail?.message) return `ElevenLabs error: ${detail.message}`;
+    } catch { /* fall through */ }
+    return String(err?.message || 'ElevenLabs API error');
+  }
 
   try {
     for (let i = 0; i < lines.length; i++) {
@@ -210,17 +231,19 @@ async function cmdRender() {
         fs.writeFileSync(tmpFile, audio);
         audioFiles.push(tmpFile);
       } catch (err) {
-        const reason = String(err?.message || err);
         lastApiError = err;
-        console.error(`[tts] Skip line ${i + 1}: ${reason}`);
+        if (isFatalApiError(err)) {
+          console.error(cleanApiErrorMessage(err));
+          bailed = true;
+          break;
+        }
+        console.error(`[tts] Skip line ${i + 1}: ${String(err?.message || err)}`);
       }
     }
 
     if (!audioFiles.length) {
-      if (lastApiError) {
-        console.error(lastApiError?.message || 'ElevenLabs API error');
-      } else {
-        console.error('No audio segments were produced.');
+      if (!bailed) {
+        console.error(lastApiError ? (lastApiError?.message || 'ElevenLabs API error') : 'No audio segments were produced.');
       }
       process.exit(1);
     }
