@@ -1034,18 +1034,26 @@ async function cmdRun() {
     if (session.podcastScript) readyItems.push('podcast script');
     if (session.reelScript) readyItems.push('reel script');
     const readyStr = readyItems.length ? `Ready: ${readyItems.join(', ')} — ` : '';
+    const hasPrompt = !!promptDest;
+    const hasPodcastScript = !!session.podcastScript || fs.existsSync(path.join(runDir, 'podcast_script.md'));
+    const hasAnyContent = !!(session.article || session.podcastScript || session.reelScript);
+    const menuOptions = [
+      { value: 'export', label: 'Use transcript only (export)' },
+      { value: 'translate', label: 'Translate transcript (coming soon)' },
+      { value: 'prompt', label: hasPrompt ? 'Regenerate research prompt' : 'Generate deep research prompt' },
+      ...(hasPrompt ? [
+        { value: 'article', label: 'Generate article' },
+        { value: 'podcast_script', label: 'Generate podcast script' },
+        { value: 'reel_script', label: 'Generate video / reel script' },
+      ] : []),
+      ...(hasPodcastScript ? [{ value: 'tts', label: 'Render podcast audio (ElevenLabs)' }] : []),
+      ...(hasAnyContent ? [{ value: 'export_zip', label: 'Export package (zip)' }] : []),
+      { value: 'summary', label: 'View stage summary' },
+      { value: 'done', label: 'Finish' }
+    ];
     const next = await prompts.select({
       message: `${readyStr}What do you want to do next?`,
-      options: [
-        { value: 'export', label: 'Use transcript only (export)' },
-        { value: 'prompt', label: 'Generate deep research prompt' },
-        { value: 'article', label: 'Generate article from prompt' },
-        { value: 'export_zip', label: 'Export package (zip)' },
-        { value: 'summary', label: 'View stage summary' },
-        { value: 'translate', label: 'Translate transcript (coming soon)' },
-        { value: 'tts', label: 'Render podcast audio (ElevenLabs)' },
-        { value: 'done', label: 'Finish' }
-      ]
+      options: menuOptions
     });
     if (prompts.isCancel(next)) return prompts.cancel('Aborted.');
 
@@ -1131,6 +1139,69 @@ async function cmdRun() {
       } else {
         prompts.log.warn('Audio file not found after render. Check ElevenLabs key and try again.');
       }
+      continue;
+    }
+
+    if (next === 'podcast_script' || next === 'reel_script') {
+      if (!lastPublishDir) {
+        if (!promptDest || !fs.existsSync(promptDest)) {
+          prompts.log.warn('Generate the deep research prompt first.');
+          continue;
+        }
+        statusNote('Generating scripts. This can take a minute.');
+        const publishCmd = `npm run yt:publish -- --input "${promptDest}" --lang ${lang}`;
+        const pub = withSpinner('Generating content...', () => runCommand(publishCmd, { cwd: process.cwd() }));
+        if (!pub.ok) {
+          prompts.log.error(pub.error || 'Generation failed');
+          continue;
+        }
+        lastPublishDir = resolveLatestPublishDir(process.cwd());
+        if (!lastPublishDir) {
+          prompts.log.error('Publish output not found.');
+          continue;
+        }
+        const articleSrc = path.join(lastPublishDir, 'article.md');
+        if (fs.existsSync(articleSrc) && !session.article) {
+          const articleDest = path.join(runDir, 'article.md');
+          fs.copyFileSync(articleSrc, articleDest);
+          session.article = articleDest;
+        }
+      }
+      const outputFile = next === 'podcast_script' ? 'podcast_script.md' : 'reel_script.md';
+      const outputSrc = path.join(lastPublishDir, outputFile);
+      if (!fs.existsSync(outputSrc)) {
+        prompts.log.warn(`${outputFile} not found in publish output.`);
+        continue;
+      }
+      const outputDest = path.join(runDir, outputFile);
+      fs.copyFileSync(outputSrc, outputDest);
+      if (next === 'podcast_script') session.podcastScript = outputDest;
+      else session.reelScript = outputDest;
+
+      previewMarkdown(outputDest);
+      let scriptGate = true;
+      while (scriptGate) {
+        const action = await prompts.select({
+          message: `${outputFile} ready`,
+          options: [
+            { value: 'view', label: 'View' },
+            { value: 'edit', label: 'Edit (terminal)' },
+            { value: 'continue', label: 'Continue' }
+          ]
+        });
+        if (prompts.isCancel(action)) { scriptGate = false; break; }
+        if (action === 'view') previewMarkdown(outputDest);
+        if (action === 'edit') {
+          const creds = readJson(getCredentialsPath()) || {};
+          const editorCmd = creds.editorCommand || '';
+          const ok = openInEditor(outputDest, editorCmd);
+          if (!ok) await editInTerminal(outputDest);
+        }
+        if (action === 'continue') scriptGate = false;
+      }
+      state.stages[next] = 'done';
+      state.updatedAt = new Date().toISOString();
+      writeRunState(runDir, state);
       continue;
     }
 
@@ -1308,19 +1379,15 @@ async function cmdRun() {
       let moreOutput = true;
       while (moreOutput) {
         const otherOutput = await prompts.select({
-          message: 'Article saved. What else was generated?',
+          message: 'Article saved. Copy social posts too?',
           options: [
-            { value: 'podcast_script', label: 'Podcast script' },
-            { value: 'reel_script', label: 'Video / reel script' },
-            { value: 'social_posts', label: 'Social posts' },
-            { value: 'skip', label: 'Nothing, continue' }
+            { value: 'social_posts', label: 'Yes, show social posts' },
+            { value: 'skip', label: 'No, continue' }
           ]
         });
         if (prompts.isCancel(otherOutput) || otherOutput === 'skip') { moreOutput = false; break; }
 
         const outputFiles = {
-          podcast_script: 'podcast_script.md',
-          reel_script: 'reel_script.md',
           social_posts: 'social_posts.md'
         };
         const outputFile = outputFiles[otherOutput];
