@@ -781,6 +781,7 @@ async function cmdRun() {
   let transcriptDest = '';
   let lastPublishDir = null;
   let lang = 'es';
+  let promptDest = null;
 
   const session = { transcript: '', article: '', podcastScript: '', reelScript: '', socialPosts: '', runDir };
 
@@ -807,11 +808,58 @@ async function cmdRun() {
       { value: 'document', label: 'Document (.pdf/.docx) — coming soon' },
       { value: 'textfile', label: 'Text file' },
       { value: 'raw', label: 'Raw text' },
+      { value: 'browse', label: 'Browse previous runs' },
       { value: 'back', label: '⬅ Back' }
     ]
   });
   if (prompts.isCancel(inputType)) return prompts.cancel('Aborted.');
   if (inputType === 'back') return cmdRun();
+
+  if (inputType === 'browse') {
+    const runs = listProjectRuns(projectName);
+    if (!runs.length) {
+      prompts.log.info('No previous runs found. Start a new input instead.');
+      return cmdRun();
+    }
+    const typeLabel = { youtube: 'YT', audio: 'Audio', textfile: 'File', raw: 'Text' };
+    const runOptions = runs.map(({ runDir: rd, source, has }) => {
+      const type = typeLabel[source.sourceType] || source.sourceType || '?';
+      const src = source.sourceId || path.basename(source.source || '') || 'unknown';
+      const lg = source.lang || '?';
+      const date = (source.createdAt || '').slice(0, 10) || path.basename(rd).slice(0, 10);
+      const badges = [
+        has('transcript.txt')    ? 'transcript' : null,
+        has('prompt.md')         ? 'prompt'     : null,
+        has('article.md')        ? 'article'    : null,
+        has('podcast_script.md') ? 'podcast'    : null,
+        has('reel_script.md')    ? 'reel'       : null,
+      ].filter(Boolean).join(' · ');
+      return { value: rd, label: `[${type}] ${src} (${lg})  ${badges || 'empty'}  ${date}` };
+    });
+    runOptions.push({ value: '__back__', label: '⬅ Back' });
+    const pick = await prompts.select({ message: 'Select a previous run to load', options: runOptions });
+    if (prompts.isCancel(pick) || pick === '__back__') return cmdRun();
+    const picked = runs.find((r) => r.runDir === pick);
+    if (picked) {
+      runDir = picked.runDir;
+      session.runDir = runDir;
+      state = picked.state;
+      lang = picked.source.lang || 'es';
+      const tPath = path.join(runDir, 'transcript.txt');
+      if (fs.existsSync(tPath)) { transcriptDest = tPath; session.transcript = tPath; }
+      promptDest = fs.existsSync(path.join(runDir, 'prompt.md')) ? path.join(runDir, 'prompt.md') : null;
+      const aPath = path.join(runDir, 'article.md');
+      if (fs.existsSync(aPath)) session.article = aPath;
+      const psPath = path.join(runDir, 'podcast_script.md');
+      if (fs.existsSync(psPath)) session.podcastScript = psPath;
+      const rsPath = path.join(runDir, 'reel_script.md');
+      if (fs.existsSync(rsPath)) session.reelScript = rsPath;
+      const socialPath = path.join(runDir, 'social_posts.md');
+      if (fs.existsSync(socialPath)) session.socialPosts = socialPath;
+      lastPublishDir = resolveLatestPublishDir(process.cwd());
+      prepDir = resolveLatestPrepDir(process.cwd());
+    }
+  } else {
 
   let inputArg = '';
   let sourceInfo = { sourceType: inputType, source: '', sourceId: '', lang: '' };
@@ -1038,9 +1086,9 @@ async function cmdRun() {
     writeRunState(runDir, state);
   }
 
+  } // end else (new input path)
   } // end else (!debuggerMode) — input collection and prep
 
-  let promptDest = null;
   let keepGoing = true;
   while (keepGoing) {
     const readyItems = [];
