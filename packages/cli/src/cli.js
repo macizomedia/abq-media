@@ -269,6 +269,21 @@ function resolveLatestProjectRun(name) {
   return runs[0] || null;
 }
 
+function listProjectRuns(projectName) {
+  const runsDir = getProjectRunsDir(projectName);
+  if (!fs.existsSync(runsDir)) return [];
+  return fs.readdirSync(runsDir)
+    .map((d) => path.join(runsDir, d))
+    .filter((p) => fs.statSync(p).isDirectory())
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
+    .map((runDir) => {
+      const source = readJson(path.join(runDir, 'source.json')) || {};
+      const state = readJson(path.join(runDir, 'state.json')) || { stages: {} };
+      const has = (f) => fs.existsSync(path.join(runDir, f));
+      return { runDir, source, state, has };
+    });
+}
+
 function getRunStatePath(runDir) {
   return path.join(runDir, 'state.json');
 }
@@ -1049,6 +1064,7 @@ async function cmdRun() {
       ...(hasPodcastScript ? [{ value: 'tts', label: 'Render podcast audio (ElevenLabs)' }] : []),
       ...(hasAnyContent ? [{ value: 'export_zip', label: 'Export package (zip)' }] : []),
       { value: 'summary', label: 'View stage summary' },
+      { value: 'list_files', label: 'Browse previous runs' },
       { value: 'done', label: 'Finish' }
     ];
     const next = await prompts.select({
@@ -1074,6 +1090,64 @@ async function cmdRun() {
 
     if (next === 'summary') {
       renderStageSummary({ runDir, state, promptPath: promptDest });
+      continue;
+    }
+
+    if (next === 'list_files') {
+      const runs = listProjectRuns(projectName);
+      if (!runs.length) {
+        prompts.log.info('No previous runs found for this project.');
+        continue;
+      }
+      const typeLabel = { youtube: 'YT', audio: 'Audio', textfile: 'File', raw: 'Text' };
+      const runOptions = runs.map(({ runDir: rd, source, has }) => {
+        const type = typeLabel[source.sourceType] || source.sourceType || '?';
+        const src = source.sourceId || path.basename(source.source || '') || 'unknown';
+        const lang = source.lang || '?';
+        const date = (source.createdAt || '').slice(0, 10) || path.basename(rd).slice(0, 10);
+        const badges = [
+          has('transcript.txt') ? 'transcript' : null,
+          has('prompt.md')      ? 'prompt'     : null,
+          has('article.md')     ? 'article'    : null,
+          has('podcast_script.md') ? 'podcast' : null,
+          has('reel_script.md') ? 'reel'       : null,
+        ].filter(Boolean).join(' · ');
+        return { value: rd, label: `[${type}] ${src} (${lang})  ${badges || 'empty'}  ${date}` };
+      });
+      runOptions.push({ value: '__back__', label: '⬅ Back' });
+
+      const pick = await prompts.select({ message: 'Select a previous run to load', options: runOptions });
+      if (prompts.isCancel(pick) || pick === '__back__') continue;
+
+      const picked = runs.find((r) => r.runDir === pick);
+      if (!picked) continue;
+
+      runDir = picked.runDir;
+      session.runDir = runDir;
+      state = picked.state;
+      lang = picked.source.lang || 'es';
+
+      const tPath = path.join(runDir, 'transcript.txt');
+      if (fs.existsSync(tPath)) { transcriptDest = tPath; session.transcript = tPath; }
+
+      promptDest = fs.existsSync(path.join(runDir, 'prompt.md')) ? path.join(runDir, 'prompt.md') : null;
+
+      const aPath = path.join(runDir, 'article.md');
+      if (fs.existsSync(aPath)) session.article = aPath;
+
+      const psPath = path.join(runDir, 'podcast_script.md');
+      if (fs.existsSync(psPath)) session.podcastScript = psPath;
+
+      const rsPath = path.join(runDir, 'reel_script.md');
+      if (fs.existsSync(rsPath)) session.reelScript = rsPath;
+
+      const socialPath = path.join(runDir, 'social_posts.md');
+      if (fs.existsSync(socialPath)) session.socialPosts = socialPath;
+
+      lastPublishDir = resolveLatestPublishDir(process.cwd());
+      prepDir = resolveLatestPrepDir(process.cwd());
+
+      prompts.log.success(`Loaded: ${path.basename(runDir)}`);
       continue;
     }
 
