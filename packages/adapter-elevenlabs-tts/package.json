@@ -1,0 +1,34 @@
+{
+  "name": "@abquanta/adapter-elevenlabs-tts",
+  "version": "0.1.0-alpha.1",
+  "description": "ElevenLabs TTS adapter for 2-host podcast scripts",
+  "type": "module",
+  "bin": {
+    "abq-el-tts": "src/cli.js"
+  },
+  "license": "MIT",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "tts:render": "node ./src/cli.js render",
+    "tts:doctor": "node ./src/cli.js doctor",
+    "test": "node --test test/smoke.test.js"
+  },
+  "keywords": [
+    "abquanta",
+    "elevenlabs",
+    "tts",
+    "podcast"
+  ],
+  "author": "abquanta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abquanta/abq-media-workspace.git"
+  }
+}

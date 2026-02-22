@@ -8,9 +8,13 @@
   },
   "main": "src/index.js",
   "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.7.0"
+  },
   "scripts": {
+    "init": "node ./src/cli.js init",
     "build": "echo 'build cli'",
-    "test": "echo 'test cli'",
+    "test": "node --test test/smoke.test.js",
     "lint": "echo 'lint cli'",
     "clean": "echo 'clean cli'"
   }

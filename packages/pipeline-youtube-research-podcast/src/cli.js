@@ -47,6 +47,18 @@ function nowStamp() {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
+function printInputHints() {
+  const hints = [
+    hasCmd('yt-dlp') ? null : 'Install yt-dlp to fetch subtitles when captions are available.',
+    'Set asrProvider + asrApiKey (or llmProvider + llmApiKey) to enable ASR fallback.',
+    hasCmd('ffmpeg') ? null : 'Install ffmpeg to support broader audio file formats.'
+  ].filter(Boolean);
+  if (hints.length) {
+    console.error('Next steps:');
+    for (const h of hints) console.error(`- ${h}`);
+  }
+}
+
 function readLocalConfig() {
   const p = path.resolve(process.cwd(), '.abq-module.json');
   let config = null;
@@ -155,52 +167,6 @@ function tryYtDlpTranscript(url, lang = 'es') {
   }
 }
 
-function tryWhisperTranscript(url, lang = 'es', whisperModel = 'base') {
-  if (!hasCmd('yt-dlp') || !hasCmd('whisper')) return null;
-
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'abq-yt-rp-whisper-'));
-  try {
-    // 1) Download audio only
-    const downloadCmd = [
-      'yt-dlp',
-      '-f', 'bestaudio',
-      '-o', '"audio.%(ext)s"',
-      url
-    ].join(' ');
-    execSync(downloadCmd, { cwd: tmp, stdio: 'pipe' });
-
-    const audio = fs.readdirSync(tmp).find((f) => /^audio\./.test(f));
-    if (!audio) return null;
-
-    // 2) Local Whisper transcription (requires python whisper CLI installed)
-    const whisperCmd = [
-      'whisper',
-      `"${audio}"`,
-      '--model', whisperModel,
-      '--language', lang,
-      '--task', 'transcribe',
-      '--output_format', 'txt',
-      '--output_dir', '.'
-    ].join(' ');
-    execSync(whisperCmd, { cwd: tmp, stdio: 'pipe' });
-
-    const txt = fs.readdirSync(tmp).find((f) => f.endsWith('.txt'));
-    if (!txt) return null;
-    const transcript = fs.readFileSync(path.join(tmp, txt), 'utf8').trim();
-    if (transcript.length < 40) return null;
-
-    return { transcript, source: `whisper-local:${whisperModel}` };
-  } catch {
-    return null;
-  } finally {
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    } catch {
-      // ignore
-    }
-  }
-}
-
 async function tryApiAsrTranscript(url, lang = 'es', config = null) {
   const asrProvider = (config?.asrProvider || config?.llmProvider || '').toLowerCase();
   const asrApiKey = config?.asrApiKey || config?.llmApiKey || '';
@@ -238,57 +204,29 @@ async function tryApiAsrTranscript(url, lang = 'es', config = null) {
       }
     }
 
-    const audioBytes = fs.readFileSync(audioPath);
-    const uploadName = path.basename(audioPath);
-
-    const form = new FormData();
-    form.append('model', asrModel);
-    form.append('language', lang);
-    form.append('response_format', 'json');
-    form.append('file', new Blob([audioBytes]), uploadName);
-
-    if (asrProvider === 'openai') {
-      const baseUrl = (config?.asrBaseUrl || config?.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/audio/transcriptions`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${asrApiKey}` },
-        body: form
-      });
-      if (!res.ok) {
-        if (process.env.ABQ_DEBUG === '1') {
-          const t = await res.text();
-          console.error(`[asr-openai] HTTP ${res.status}: ${t.slice(0, 300)}`);
-        }
-        return null;
-      }
-      const json = await res.json();
-      const transcript = (json?.text || '').trim();
-      if (transcript.length < 40) return null;
-      return { transcript, source: `asr-openai:${asrModel}` };
+    const result = await asrRequest({
+      provider: asrProvider,
+      apiKey: asrApiKey,
+      model: asrModel,
+      lang,
+      audioPath,
+      config
+    });
+    if (result.ok) {
+      return { transcript: result.text, source: `${result.provider}:${asrModel}` };
     }
 
-    if (asrProvider === 'openrouter') {
-      const baseUrl = (config?.asrBaseUrl || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/audio/transcriptions`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${asrApiKey}`,
-          'HTTP-Referer': 'https://github.com/abquanta/pipeline-youtube-research-podcast',
-          'X-Title': 'abq-yt-rp'
-        },
-        body: form
+    if (result.inputTooLarge) {
+      const chunked = await asrTranscribeInChunks({
+        provider: asrProvider,
+        apiKey: asrApiKey,
+        model: asrModel,
+        lang,
+        audioPath,
+        tmpDir: tmp,
+        config
       });
-      if (!res.ok) {
-        if (process.env.ABQ_DEBUG === '1') {
-          const t = await res.text();
-          console.error(`[asr-openrouter] HTTP ${res.status}: ${t.slice(0, 300)}`);
-        }
-        return null;
-      }
-      const json = await res.json();
-      const transcript = (json?.text || '').trim();
-      if (transcript.length < 40) return null;
-      return { transcript, source: `asr-openrouter:${asrModel}` };
+      if (chunked) return { transcript: chunked, source: `${asrProvider}:${asrModel}+chunked` };
     }
 
     return null;
@@ -306,8 +244,165 @@ async function tryApiAsrTranscript(url, lang = 'es', config = null) {
   }
 }
 
-async function fetchYouTubeCaptions(videoId, url, lang = 'es', config = null) {
+function isInputTooLargeError(text) {
+  const t = String(text || '').toLowerCase();
+  return t.includes('input_too_large') || t.includes('too large for this model');
+}
+
+async function asrRequest({ provider, apiKey, model, lang, audioPath, config }) {
+  const audioBytes = fs.readFileSync(audioPath);
+  const uploadName = path.basename(audioPath);
+
+  const form = new FormData();
+  form.append('model', model);
+  form.append('language', lang);
+  form.append('response_format', 'json');
+  form.append('file', new Blob([audioBytes]), uploadName);
+
+  if (provider === 'openai') {
+    const baseUrl = (config?.asrBaseUrl || config?.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
+    const res = await fetch(`${baseUrl}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}` },
+      body: form
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      if (process.env.ABQ_DEBUG === '1') {
+        console.error(`[asr-openai] HTTP ${res.status}: ${t.slice(0, 300)}`);
+      }
+      return { ok: false, inputTooLarge: isInputTooLargeError(t), provider: 'asr-openai' };
+    }
+    const json = await res.json();
+    const transcript = (json?.text || '').trim();
+    if (transcript.length < 40) return { ok: false, inputTooLarge: false, provider: 'asr-openai' };
+    return { ok: true, text: transcript, provider: 'asr-openai' };
+  }
+
+  if (provider === 'openrouter') {
+    const baseUrl = (config?.asrBaseUrl || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+    const res = await fetch(`${baseUrl}/audio/transcriptions`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://github.com/abquanta/pipeline-youtube-research-podcast',
+        'X-Title': 'abq-yt-rp'
+      },
+      body: form
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      if (process.env.ABQ_DEBUG === '1') {
+        console.error(`[asr-openrouter] HTTP ${res.status}: ${t.slice(0, 300)}`);
+      }
+      return { ok: false, inputTooLarge: isInputTooLargeError(t), provider: 'asr-openrouter' };
+    }
+    const json = await res.json();
+    const transcript = (json?.text || '').trim();
+    if (transcript.length < 40) return { ok: false, inputTooLarge: false, provider: 'asr-openrouter' };
+    return { ok: true, text: transcript, provider: 'asr-openrouter' };
+  }
+
+  return { ok: false, inputTooLarge: false, provider: 'asr-unknown' };
+}
+
+function splitAudioIntoChunks({ audioPath, tmpDir, segmentSeconds }) {
+  if (!hasCmd('ffmpeg')) return [];
+  const pattern = path.join(tmpDir, 'chunk-%03d.mp3');
+  execSync(
+    `ffmpeg -y -i \"${audioPath}\" -f segment -segment_time ${segmentSeconds} -c copy -reset_timestamps 1 \"${pattern}\"`,
+    { stdio: 'pipe' }
+  );
+  const files = fs.readdirSync(tmpDir)
+    .filter((f) => f.startsWith('chunk-') && f.endsWith('.mp3'))
+    .map((f) => path.join(tmpDir, f))
+    .sort();
+  return files;
+}
+
+async function asrTranscribeInChunks({ provider, apiKey, model, lang, audioPath, tmpDir, config }) {
+  if (!hasCmd('ffmpeg')) return null;
+  const chunks = splitAudioIntoChunks({ audioPath, tmpDir, segmentSeconds: 600 });
+  if (!chunks.length) return null;
+
+  const parts = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const result = await asrRequest({ provider, apiKey, model, lang, audioPath: chunks[i], config });
+    if (!result.ok || !result.text) return null;
+    parts.push(result.text.trim());
+  }
+  return parts.join('\n\n');
+}
+
+async function tryApiAsrTranscriptFromFile(filePath, lang = 'es', config = null) {
+  const asrProvider = (config?.asrProvider || config?.llmProvider || '').toLowerCase();
+  const asrApiKey = config?.asrApiKey || config?.llmApiKey || '';
+  const asrModel = config?.asrModel || 'gpt-4o-mini-transcribe';
+
+  if (!asrProvider || !asrApiKey) return null;
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'abq-yt-rp-asr-file-'));
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const ext = path.extname(filePath).toLowerCase();
+    let audioPath = filePath;
+
+    if (ext !== '.mp3' && hasCmd('ffmpeg')) {
+      const mp3Path = path.join(tmp, 'audio.mp3');
+      try {
+        execSync(`ffmpeg -y -i "${filePath}" -vn -ac 1 -ar 16000 -b:a 64k "${mp3Path}"`, {
+          cwd: tmp,
+          stdio: 'pipe'
+        });
+        if (fs.existsSync(mp3Path)) audioPath = mp3Path;
+      } catch {
+        // keep original if conversion fails
+      }
+    }
+
+    const result = await asrRequest({
+      provider: asrProvider,
+      apiKey: asrApiKey,
+      model: asrModel,
+      lang,
+      audioPath,
+      config
+    });
+    if (result.ok) {
+      return { transcript: result.text, source: `${result.provider}:${asrModel}` };
+    }
+
+    if (result.inputTooLarge) {
+      const chunked = await asrTranscribeInChunks({
+        provider: asrProvider,
+        apiKey: asrApiKey,
+        model: asrModel,
+        lang,
+        audioPath,
+        tmpDir: tmp,
+        config
+      });
+      if (chunked) return { transcript: chunked, source: `${asrProvider}:${asrModel}+chunked` };
+    }
+
+    return null;
+  } catch (err) {
+    if (process.env.ABQ_DEBUG === '1') {
+      console.error(`[asr-file] ${String(err?.message || err)}`);
+    }
+    return null;
+  } finally {
+    try {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  }
+}
+
+async function fetchYouTubeCaptions(videoId, url, lang = 'es', config = null, options = {}) {
   const fallbackTrace = [];
+  const allowAsr = options?.allowAsr !== false;
 
   // Step 1: YouTube captions API
   const langCandidates = [lang, 'es', 'en', 'en-US'];
@@ -328,7 +423,7 @@ async function fetchYouTubeCaptions(videoId, url, lang = 'es', config = null) {
       const text = stripXml(xml);
       if (text.length > 40) {
         fallbackTrace.push({ step: 'youtube-captions', status: 'ok' });
-        return { transcript: text, source: endpoint };
+        return { transcript: text, source: endpoint, trace: fallbackTrace };
       }
     }
   } catch (err) {
@@ -348,30 +443,23 @@ async function fetchYouTubeCaptions(videoId, url, lang = 'es', config = null) {
     }
     if (ytdlp) {
       fallbackTrace.push({ step: 'yt-dlp', status: 'ok' });
-      return ytdlp;
+      return { ...ytdlp, trace: fallbackTrace };
     }
     fallbackTrace.push({ step: 'yt-dlp', status: 'fail', reason: 'no subtitle files produced' });
   }
 
-  // Step 3: Local Whisper
-  const whisperModel = config?.whisperModel || process.env.WHISPER_MODEL || 'base';
-  if (!hasCmd('whisper')) {
-    fallbackTrace.push({ step: 'whisper', status: 'skip', reason: 'not installed' });
-  } else {
-    let whisper = null;
-    try {
-      whisper = tryWhisperTranscript(url, lang, whisperModel);
-    } catch (err) {
-      // swallowed in tryWhisperTranscript; extra safety
-    }
-    if (whisper) {
-      fallbackTrace.push({ step: 'whisper', status: 'ok' });
-      return whisper;
-    }
-    fallbackTrace.push({ step: 'whisper', status: 'fail', reason: 'transcription produced no output' });
+  // Step 3: API ASR
+  if (!allowAsr) {
+    fallbackTrace.push({ step: 'asr-api', status: 'skip', reason: 'captions-only mode' });
+    const traceLines = fallbackTrace
+      .map((entry, i) => {
+        const suffix = entry.reason ? ` (${entry.reason})` : '';
+        return `  ${i + 1}. ${entry.step}: ${entry.status.toUpperCase()}${suffix}`;
+      })
+      .join('\n');
+    throw new Error(`No transcript found. Fallback chain:\n${traceLines}`);
   }
 
-  // Step 4: API ASR
   const asrProvider = (config?.asrProvider || config?.llmProvider || '').toLowerCase();
   const asrApiKey = config?.asrApiKey || config?.llmApiKey || '';
   if (!asrProvider || !asrApiKey) {
@@ -385,7 +473,7 @@ async function fetchYouTubeCaptions(videoId, url, lang = 'es', config = null) {
     }
     if (apiAsr) {
       fallbackTrace.push({ step: 'asr-api', status: 'ok' });
-      return apiAsr;
+      return { ...apiAsr, trace: fallbackTrace };
     }
     fallbackTrace.push({ step: 'asr-api', status: 'fail', reason: 'API ASR returned no transcript' });
   }
@@ -516,11 +604,11 @@ function buildLlmMessages(transcript) {
   ];
 }
 
-async function callOpenAICompatible({ baseUrl, apiKey, model, transcript }) {
+async function callOpenAICompatible({ baseUrl, apiKey, model, transcript, messages }) {
   const body = {
     model,
     temperature: 0.2,
-    messages: buildLlmMessages(transcript)
+    messages: messages || buildLlmMessages(transcript)
   };
 
   const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
@@ -543,11 +631,11 @@ async function callOpenAICompatible({ baseUrl, apiKey, model, transcript }) {
   return text;
 }
 
-async function callOpenRouter({ apiKey, model, transcript }) {
+async function callOpenRouter({ apiKey, model, transcript, messages }) {
   const body = {
     model,
     temperature: 0.2,
-    messages: buildLlmMessages(transcript)
+    messages: messages || buildLlmMessages(transcript)
   };
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -662,6 +750,83 @@ async function maybeLLMRefineDigest({ transcript, talkingPoints, config }) {
   }
 }
 
+function buildPublishMessages({ researchPrompt, outputType, lang }) {
+  const intro = `You are a senior content editor and scriptwriter. Output language: ${lang}.`;
+  const common = 'Use the research prompt as the single source of truth. Do not invent facts. Avoid fluff.';
+  const variants = {
+    podcast_script: [
+      `You are a podcast scriptwriter for Abquanta, a strategic intelligence`,
+      `platform covering Venezuela and geopolitics. Write a 2-host conversational`,
+      `dialogue podcast script in ${lang} using this structure:`,
+      '',
+      '- Two hosts: HOST_A (lead analyst, authoritative) and HOST_B (curious',
+      '  co-host who asks the right questions)',
+      '- Format every line as: HOST_A: [text] or HOST_B: [text]',
+      '- No stage directions, no headers, no markdown — pure dialogue only',
+      '- Length: ~2000 words (approx 12-15 minutes of audio)',
+      '- Open with a hook that would stop someone mid-scroll',
+      '- Hosts should challenge each other\'s points naturally',
+      '- Close with 3 clear actionable takeaways delivered conversationally',
+      '- Tone: serious but engaging — like a smart radio show, not a lecture'
+    ].join(' '),
+    article: [
+      intro,
+      `Write a Substack-ready long-form article in ${lang}.`,
+      'Structure: SEO headline + subtitle, lead paragraph (hook), 4–5 sections with subheaders, closing CTA: "Subscribe for more Abquanta intelligence".',
+      'Target length: 800–1200 words.',
+      'Output markdown with headline, subtitle, and section headers.'
+    ].join(' '),
+    reel_script: [
+      intro,
+      `Write a 60-second short-form video script in ${lang}.`,
+      'Structure: Hook line in first 3 seconds, 3 key points (10 seconds each), call to action (Substack link).',
+      'Format each beat as [VISUAL] then [NARRATION].',
+      'Keep lines tight and timed for spoken delivery.'
+    ].join(' '),
+    social_posts: [
+      intro,
+      `Produce social content in ${lang} with three parts:`,
+      '1) X/Twitter thread (8–10 tweets).',
+      '2) LinkedIn post (~200 words).',
+      '3) Instagram caption with 5 hashtags.',
+      'Separate each part with clear markdown headings.'
+    ].join(' ')
+  };
+
+  const system = `${variants[outputType] || intro} ${common}`.trim();
+  return [
+    { role: 'system', content: system },
+    { role: 'user', content: `Research prompt:\n\n${researchPrompt}` }
+  ];
+}
+
+async function callPublishLLM({ researchPrompt, outputType, lang, config }) {
+  const provider = String(config?.llmProvider || '').toLowerCase();
+  const model = config?.publishModel || config?.model || (provider === 'openrouter' ? 'openrouter/auto' : 'gpt-4o-mini');
+  const messages = buildPublishMessages({ researchPrompt, outputType, lang });
+
+  if (provider === 'openai') {
+    if (!config?.llmApiKey) throw new Error('Missing llmApiKey for openai');
+    return callOpenAICompatible({
+      baseUrl: config?.baseUrl || 'https://api.openai.com/v1',
+      apiKey: config.llmApiKey,
+      model,
+      messages
+    });
+  }
+
+  if (provider === 'openrouter') {
+    if (!config?.llmApiKey) throw new Error('Missing llmApiKey for openrouter');
+    return callOpenRouter({
+      apiKey: config.llmApiKey,
+      model,
+      messages
+    });
+  }
+
+  throw new Error(`Unsupported llmProvider: ${provider || 'none'}`);
+}
+
 function cmdInit() {
   console.log('Run: npm run init');
 }
@@ -671,7 +836,6 @@ function cmdDoctor() {
 
   const checks = {
     ytDlp: hasCmd('yt-dlp'),
-    whisper: hasCmd('whisper'),
     ffmpeg: hasCmd('ffmpeg')
   };
 
@@ -685,11 +849,11 @@ function cmdDoctor() {
   const transcriptPaths = [];
   transcriptPaths.push('youtube-captions (always attempted)');
   if (checks.ytDlp) transcriptPaths.push('yt-dlp-subs');
-  if (checks.ytDlp && checks.whisper && checks.ffmpeg) transcriptPaths.push('whisper-local');
   if (checks.ytDlp && asrProvider && hasAsrKey) transcriptPaths.push(`asr-${String(asrProvider).toLowerCase()}`);
   transcriptPaths.push('transcript-file');
   transcriptPaths.push('text-inline');
   transcriptPaths.push('text-file');
+  transcriptPaths.push('audio-file (ASR)');
 
   let digestMode = 'heuristic';
   if (llmProvider === 'openrouter-agent' && hasAgentEndpoint) digestMode = 'llm-openrouter-agent (if endpoint/auth/model valid)';
@@ -709,8 +873,7 @@ function cmdDoctor() {
     expectedDigestMode: digestMode,
     hints: [
       checks.ytDlp ? null : 'Install yt-dlp for subtitle/audio fallbacks.',
-      checks.whisper ? null : 'Install whisper CLI to enable local whisper fallback.',
-      checks.ffmpeg ? null : 'Install ffmpeg to support local whisper audio decoding.',
+      checks.ffmpeg ? null : 'Install ffmpeg to enable audio file conversion for ASR.',
       llmProvider ? null : 'Set llmProvider in .abq-module.json to enable LLM digest.',
       asrProvider ? null : 'Set asrProvider + asrApiKey to enable API ASR fallback.'
     ].filter(Boolean)
@@ -723,12 +886,24 @@ async function cmdPrep() {
   const rawUrl = arg('--url');
   const url = normalizeUrlInput(rawUrl);
   const lang = arg('--lang', 'es');
+  const audioFile = arg('--audio-file');
   const transcriptFile = arg('--transcript-file');
   const textInline = arg('--text');
   const textFile = arg('--text-file');
+  const useCaptionsOnly = process.argv.includes('--use-captions')
+    || arg('--use-captions') === '1'
+    || arg('--use-captions') === 'true';
+  const useAsrOnly = process.argv.includes('--use-asr')
+    || arg('--use-asr') === '1'
+    || arg('--use-asr') === 'true';
 
-  if (!url && !transcriptFile && !textInline && !textFile) {
-    console.error('Usage: abq-yt-rp prep (--url <youtube-url> | --transcript-file <path> | --text "..." | --text-file <path>) [--lang es]');
+  if (!url && !audioFile && !transcriptFile && !textInline && !textFile) {
+    console.error('Usage: abq-yt-rp prep (--url <youtube-url> | --audio-file <path> | --transcript-file <path> | --text "..." | --text-file <path>) [--lang es] [--use-captions] [--use-asr]');
+    process.exit(1);
+  }
+
+  if (useCaptionsOnly && useAsrOnly) {
+    console.error('Invalid flags: --use-captions and --use-asr cannot be used together.');
     process.exit(1);
   }
 
@@ -745,6 +920,7 @@ async function cmdPrep() {
   ensureDir(out);
 
   const config = readLocalConfig();
+  const inputTrace = [];
 
   let transcript = '';
   let source = '';
@@ -756,6 +932,7 @@ async function cmdPrep() {
     source = 'inline:text';
     transcriptMode = 'text-inline';
     sourceType = 'plain text';
+    inputTrace.push({ step: 'text-inline', status: transcript ? 'ok' : 'fail' });
   } else if (textFile) {
     const p = path.resolve(process.cwd(), textFile);
     if (!fs.existsSync(p)) {
@@ -766,6 +943,29 @@ async function cmdPrep() {
     source = `file:${p}`;
     transcriptMode = 'text-file';
     sourceType = 'plain text file';
+    inputTrace.push({ step: 'text-file', status: transcript ? 'ok' : 'fail', path: p });
+  } else if (audioFile) {
+    const p = path.resolve(process.cwd(), audioFile);
+    if (!fs.existsSync(p)) {
+      console.error(`Audio file not found: ${p}`);
+      process.exit(1);
+    }
+    const asrProvider = (config?.asrProvider || config?.llmProvider || '').toLowerCase();
+    const asrApiKey = config?.asrApiKey || config?.llmApiKey || '';
+    if (!asrProvider || !asrApiKey) {
+      console.error('ASR not configured. Set asrProvider + asrApiKey (or llmProvider + llmApiKey) for audio transcription.');
+      process.exit(1);
+    }
+    const asrResult = await tryApiAsrTranscriptFromFile(p, lang, config);
+    if (!asrResult) {
+      console.error('ASR transcription failed for audio input. Check API key/provider.');
+      process.exit(1);
+    }
+    transcript = asrResult.transcript;
+    source = `file:${p}`;
+    transcriptMode = asrResult.source || 'asr-api';
+    sourceType = 'audio file';
+    inputTrace.push({ step: 'asr-audio', status: 'ok', path: p, source: asrResult.source });
   } else if (transcriptFile) {
     const p = path.resolve(process.cwd(), transcriptFile);
     if (!fs.existsSync(p)) {
@@ -776,16 +976,42 @@ async function cmdPrep() {
     source = `file:${p}`;
     transcriptMode = 'transcript-file';
     sourceType = 'transcript file';
+    inputTrace.push({ step: 'transcript-file', status: transcript ? 'ok' : 'fail', path: p });
   } else {
-    const fetched = await fetchYouTubeCaptions(videoId, url, lang, config);
-    transcript = fetched.transcript;
-    source = fetched.source;
-    if (source.startsWith('yt-dlp:')) transcriptMode = 'yt-dlp-subs';
-    else if (source.startsWith('whisper-local:')) transcriptMode = 'whisper-local';
-    else if (source.startsWith('asr-openai:')) transcriptMode = 'asr-openai';
-    else if (source.startsWith('asr-openrouter:')) transcriptMode = 'asr-openrouter';
-    else transcriptMode = 'youtube-captions';
-    sourceType = 'YouTube video';
+    if (useAsrOnly) {
+      const asrProvider = (config?.asrProvider || config?.llmProvider || '').toLowerCase();
+      const asrApiKey = config?.asrApiKey || config?.llmApiKey || '';
+      if (!asrProvider || !asrApiKey) {
+        console.error('ASR not configured. Set asrProvider + asrApiKey (or llmProvider + llmApiKey) to use --use-asr.');
+        process.exit(1);
+      }
+      const asrResult = await tryApiAsrTranscript(url, lang, config);
+      if (!asrResult) {
+        console.error('ASR transcription failed. Check API key/provider.');
+        process.exit(1);
+      }
+      transcript = asrResult.transcript;
+      source = asrResult.source;
+      transcriptMode = source.startsWith('asr-openai:') ? 'asr-openai' : 'asr-openrouter';
+      sourceType = 'YouTube video (ASR)';
+      inputTrace.push({ step: 'asr-api', status: 'ok', source });
+    } else {
+      try {
+        const fetched = await fetchYouTubeCaptions(videoId, url, lang, config, { allowAsr: !useCaptionsOnly });
+        transcript = fetched.transcript;
+        source = fetched.source;
+        inputTrace.push(...(fetched.trace || []));
+        if (source.startsWith('yt-dlp:')) transcriptMode = 'yt-dlp-subs';
+        else if (source.startsWith('asr-openai:')) transcriptMode = 'asr-openai';
+        else if (source.startsWith('asr-openrouter:')) transcriptMode = 'asr-openrouter';
+        else transcriptMode = 'youtube-captions';
+        sourceType = 'YouTube video';
+      } catch (err) {
+        console.error(err?.message || err);
+        printInputHints();
+        process.exit(1);
+      }
+    }
   }
 
   if (!transcript || transcript.trim().length < 40) {
@@ -815,11 +1041,109 @@ async function cmdPrep() {
     createdAt: new Date().toISOString()
   }, null, 2));
 
+  fs.writeFileSync(path.join(out, 'input_trace.json'), JSON.stringify({
+    input: {
+      url: url || null,
+      audioFile: audioFile ? path.resolve(process.cwd(), audioFile) : null,
+      transcriptFile: transcriptFile ? path.resolve(process.cwd(), transcriptFile) : null,
+      textFile: textFile ? path.resolve(process.cwd(), textFile) : null
+    },
+    flags: {
+      useCaptionsOnly,
+      useAsrOnly
+    },
+    trace: inputTrace
+  }, null, 2));
+
   fs.writeFileSync(path.join(out, 'transcript.txt'), transcript + '\n');
   fs.writeFileSync(path.join(out, 'digest.md'), digestResult.digest + '\n');
   fs.writeFileSync(path.join(out, 'deep_research_prompt.md'), prompt + '\n');
 
   console.log(`Prep artifacts created at: ${out}`);
+}
+
+async function cmdPublish() {
+  const input = arg('--input');
+  const lang = arg('--lang', 'es');
+  const useLatest = process.argv.includes('--latest');
+  if (!input && !useLatest) {
+    console.error('Usage: abq-yt-rp publish --input <path/to/deep_research_prompt.md> [--lang es] [--latest]');
+    process.exit(1);
+  }
+
+  const resolvedInput = input || resolveLatestPrepPath('prompt');
+  const inputPath = path.resolve(process.cwd(), resolvedInput);
+  if (!fs.existsSync(inputPath)) {
+    console.error(`Input file not found: ${inputPath}`);
+    process.exit(1);
+  }
+
+  const config = readLocalConfig();
+  const provider = String(config?.llmProvider || '').toLowerCase();
+  if (!provider) {
+    console.error('LLM provider not configured. Set llmProvider in .abq-module.json.');
+    process.exit(1);
+  }
+  if (!config?.llmApiKey) {
+    console.error('LLM API key not configured. Set llmApiKey in .abq-module.json or env.');
+    process.exit(1);
+  }
+  if (provider !== 'openai' && provider !== 'openrouter') {
+    console.error(`Unsupported llmProvider for publish: ${provider}`);
+    process.exit(1);
+  }
+
+  const researchPrompt = fs.readFileSync(inputPath, 'utf8').trim();
+  if (!researchPrompt) {
+    console.error('Input file is empty.');
+    process.exit(1);
+  }
+
+  const out = path.resolve(process.cwd(), 'output', `publish-${nowStamp()}`);
+  ensureDir(out);
+
+  const model = config?.publishModel || config?.model || (provider === 'openrouter' ? 'openrouter/auto' : 'gpt-4o-mini');
+  const metadata = {
+    stage: 'publish',
+    inputFile: inputPath,
+    lang,
+    model,
+    createdAt: new Date().toISOString(),
+    outputs: {
+      podcast_script: 'error: not generated',
+      article: 'error: not generated',
+      reel_script: 'error: not generated',
+      social_posts: 'error: not generated'
+    }
+  };
+
+  const jobs = [
+    { type: 'podcast_script', file: 'podcast_script.md' },
+    { type: 'article', file: 'article.md' },
+    { type: 'reel_script', file: 'reel_script.md' },
+    { type: 'social_posts', file: 'social_posts.md' }
+  ];
+
+  for (const job of jobs) {
+    try {
+      const text = await callPublishLLM({
+        researchPrompt,
+        outputType: job.type,
+        lang,
+        config
+      });
+      fs.writeFileSync(path.join(out, job.file), text.trim() + '\n');
+      metadata.outputs[job.type] = 'ok';
+      console.log(`[publish] ${job.type}: ok`);
+    } catch (err) {
+      const reason = String(err?.message || err);
+      metadata.outputs[job.type] = `error: ${reason}`;
+      console.error(`[publish] ${job.type}: ${reason}`);
+    }
+  }
+
+  fs.writeFileSync(path.join(out, 'metadata.json'), JSON.stringify(metadata, null, 2));
+  console.log(`Publish artifacts created at: ${out}`);
 }
 
 function cmdPodcast() {
@@ -834,6 +1158,10 @@ function cmdPodcast() {
 
 function cmdLatest() {
   const open = (arg('--open') || '').toLowerCase();
+  console.log(resolveLatestPrepPath(open || null));
+}
+
+function resolveLatestPrepPath(open = null) {
   const outDir = path.resolve(process.cwd(), 'output');
   if (!fs.existsSync(outDir)) {
     console.error('No output directory found yet.');
@@ -852,10 +1180,7 @@ function cmdLatest() {
   }
 
   const latest = runs[0];
-  if (!open) {
-    console.log(latest);
-    return;
-  }
+  if (!open) return latest;
 
   const map = {
     prompt: 'deep_research_prompt.md',
@@ -876,7 +1201,7 @@ function cmdLatest() {
     process.exit(1);
   }
 
-  console.log(target);
+  return target;
 }
 
 const command = process.argv[2];
@@ -887,6 +1212,9 @@ const command = process.argv[2];
       break;
     case 'prep':
       await cmdPrep();
+      break;
+    case 'publish':
+      await cmdPublish();
       break;
     case 'podcast':
       cmdPodcast();
@@ -902,7 +1230,8 @@ const command = process.argv[2];
       console.log('  init');
       console.log('  doctor');
       console.log('  latest [--open prompt|digest|transcript|metadata]');
-      console.log('  prep (--url <youtube-url> | --transcript-file <path> | --text "..." | --text-file <path>) [--lang es]');
+      console.log('  prep (--url <youtube-url> | --audio-file <path> | --transcript-file <path> | --text "..." | --text-file <path>) [--lang es] [--use-captions] [--use-asr]');
+      console.log('  publish --input <path/to/deep_research_prompt.md> [--lang es] [--latest]');
       console.log('  podcast --input <research.md> [--lang es]');
   }
 })().catch((err) => {
