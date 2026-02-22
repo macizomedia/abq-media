@@ -42,6 +42,7 @@ async function cmdInit() {
   let cta = arg('--cta');
   let tone = arg('--tone', 'informative');
   let editorCommand = arg('--editor');
+  let elevenLabsApiKey = arg('--elevenlabs-key');
 
   if (!nonInteractive && process.stdin.isTTY) {
     if (!projectName) projectName = await ask(`Project name [${path.basename(process.cwd())}]: `, path.basename(process.cwd()));
@@ -49,6 +50,7 @@ async function cmdInit() {
     if (!llmApiKey) llmApiKey = await ask('LLM API key (leave blank to skip): ');
     if (!asrProvider) asrProvider = await ask('ASR provider (openai|openrouter) [openai]: ', 'openai');
     if (!asrApiKey) asrApiKey = await ask('ASR API key (leave blank to skip): ');
+    if (!elevenLabsApiKey) elevenLabsApiKey = await ask('ElevenLabs API key (leave blank to skip): ');
     if (!lang) lang = await ask('Default language [es]: ', 'es');
     if (!timezone) timezone = await ask('Timezone [UTC]: ', 'UTC');
     if (!asrModel) asrModel = await ask('ASR model [whisper-1]: ', 'whisper-1');
@@ -85,6 +87,7 @@ async function cmdInit() {
     asrProvider: asrProvider || existingCreds.asrProvider || llmProvider || '',
     asrApiKey: asrApiKey || existingCreds.asrApiKey || '',
     asrModel: asrModel || existingCreds.asrModel || 'whisper-1',
+    elevenLabsApiKey: elevenLabsApiKey || existingCreds.elevenLabsApiKey || '',
     editorCommand: detectedEditor,
     lang,
     timezone,
@@ -1248,16 +1251,17 @@ async function cmdRun() {
         continue;
       }
       const ttsConfig = readJson(path.resolve(process.cwd(), '.abq-module.json')) || {};
-      const ttsKey = ttsConfig.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY || '';
+      const globalCreds = readJson(getCredentialsPath()) || {};
+      const ttsKey = ttsConfig.elevenLabsApiKey || globalCreds.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY || '';
       if (!ttsKey) {
-        prompts.log.error('ElevenLabs API key not set. Add elevenLabsApiKey to .abq-module.json or set ELEVENLABS_API_KEY=<key> in your environment.');
+        prompts.log.error('ElevenLabs API key not set. Run "abq-media init" to add it, or set ELEVENLABS_API_KEY in your environment.');
         continue;
       }
       const ttsCmd = `node packages/adapter-elevenlabs-tts/src/cli.js render --input "${podcastScriptPath}" --output "${path.join(runDir, 'podcast.mp3')}"`;
       prompts.log.info(`Will run: ${ttsCmd}`);
       const confirmTts = await prompts.confirm({ message: 'Run ElevenLabs TTS now?', initialValue: false });
       if (prompts.isCancel(confirmTts) || !confirmTts) { continue; }
-      const ttsResult = withSpinner('Rendering audio...', () => runCommand(ttsCmd, { cwd: process.cwd() }));
+      const ttsResult = withSpinner('Rendering audio...', () => runCommand(ttsCmd, { cwd: process.cwd(), env: { ...process.env, ELEVENLABS_API_KEY: ttsKey } }));
       const audioOut = path.join(runDir, 'podcast.mp3');
       if (fs.existsSync(audioOut)) {
         prompts.log.success(`Audio saved: ${audioOut}`);
