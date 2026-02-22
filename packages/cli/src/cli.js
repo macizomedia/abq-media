@@ -350,13 +350,24 @@ function upsertRegistryEntry(projectName, info, transcriptPath) {
 
 function resolveLatestPrepDir(cwd) {
   const outDir = path.resolve(cwd, 'output');
-  if (!fs.existsSync(outDir)) return null;
-  const runs = fs.readdirSync(outDir)
-    .filter((d) => d.startsWith('prep-'))
-    .map((d) => path.join(outDir, d))
-    .filter((p) => fs.statSync(p).isDirectory())
-    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
-  return runs[0] || null;
+  if (fs.existsSync(outDir)) {
+    const runs = fs.readdirSync(outDir)
+      .filter((d) => d.startsWith('prep-'))
+      .map((d) => path.join(outDir, d))
+      .filter((p) => fs.statSync(p).isDirectory())
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    if (runs.length) return runs[0];
+  }
+  const pipelineOut = path.resolve(cwd, 'packages/pipeline-youtube-research-podcast/output');
+  if (fs.existsSync(pipelineOut)) {
+    const runs = fs.readdirSync(pipelineOut)
+      .filter((d) => d.startsWith('prep-'))
+      .map((d) => path.join(pipelineOut, d))
+      .filter((p) => fs.statSync(p).isDirectory())
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    if (runs.length) return runs[0];
+  }
+  return null;
 }
 
 function resolveLatestPublishDir(cwd) {
