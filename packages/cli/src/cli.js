@@ -1247,11 +1247,17 @@ async function cmdRun() {
         prompts.log.warn('No podcast script found. Generate one first via the article path.');
         continue;
       }
+      const ttsConfig = readJson(path.resolve(process.cwd(), '.abq-module.json')) || {};
+      const ttsKey = ttsConfig.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY || '';
+      if (!ttsKey) {
+        prompts.log.error('ElevenLabs API key not set. Add elevenLabsApiKey to .abq-module.json or set ELEVENLABS_API_KEY=<key> in your environment.');
+        continue;
+      }
       const ttsCmd = `node packages/adapter-elevenlabs-tts/src/cli.js render --input "${podcastScriptPath}" --output "${path.join(runDir, 'podcast.mp3')}"`;
       prompts.log.info(`Will run: ${ttsCmd}`);
       const confirmTts = await prompts.confirm({ message: 'Run ElevenLabs TTS now?', initialValue: false });
       if (prompts.isCancel(confirmTts) || !confirmTts) { continue; }
-      withSpinner('Rendering audio...', () => runCommand(ttsCmd, { cwd: process.cwd() }));
+      const ttsResult = withSpinner('Rendering audio...', () => runCommand(ttsCmd, { cwd: process.cwd() }));
       const audioOut = path.join(runDir, 'podcast.mp3');
       if (fs.existsSync(audioOut)) {
         prompts.log.success(`Audio saved: ${audioOut}`);
@@ -1259,7 +1265,7 @@ async function cmdRun() {
         state.updatedAt = new Date().toISOString();
         writeRunState(runDir, state);
       } else {
-        prompts.log.warn('Audio file not found after render. Check ElevenLabs key and try again.');
+        prompts.log.error(ttsResult?.error || 'Render failed — no output file produced.');
       }
       continue;
     }
