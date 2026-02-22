@@ -204,6 +204,23 @@ async function tryApiAsrTranscript(url, lang = 'es', config = null) {
       }
     }
 
+    const audioSize = fs.statSync(audioPath).size;
+    const CHUNK_THRESHOLD = 20 * 1024 * 1024; // 20 MB — under Whisper's 25 MB limit
+
+    if (audioSize >= CHUNK_THRESHOLD) {
+      const chunked = await asrTranscribeInChunks({
+        provider: asrProvider,
+        apiKey: asrApiKey,
+        model: asrModel,
+        lang,
+        audioPath,
+        tmpDir: tmp,
+        config
+      });
+      if (chunked) return { transcript: chunked, source: `${asrProvider}:${asrModel}+chunked` };
+      return null;
+    }
+
     const result = await asrRequest({
       provider: asrProvider,
       apiKey: asrApiKey,
@@ -358,6 +375,23 @@ async function tryApiAsrTranscriptFromFile(filePath, lang = 'es', config = null)
       } catch {
         // keep original if conversion fails
       }
+    }
+
+    const audioSize = fs.statSync(audioPath).size;
+    const CHUNK_THRESHOLD = 20 * 1024 * 1024; // 20 MB — under Whisper's 25 MB limit
+
+    if (audioSize >= CHUNK_THRESHOLD) {
+      const chunked = await asrTranscribeInChunks({
+        provider: asrProvider,
+        apiKey: asrApiKey,
+        model: asrModel,
+        lang,
+        audioPath,
+        tmpDir: tmp,
+        config
+      });
+      if (chunked) return { transcript: chunked, source: `${asrProvider}:${asrModel}+chunked` };
+      return null;
     }
 
     const result = await asrRequest({
