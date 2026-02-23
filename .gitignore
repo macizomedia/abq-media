@@ -5,3 +5,5 @@ node_modules/
 *.local
 
 dist/
+*.tmp
+karaoke_input.txt
