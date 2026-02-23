@@ -4,18 +4,34 @@
   "description": "CLI for Abquanta media pipeline.",
   "type": "module",
   "bin": {
-    "abq-media": "src/cli.js"
+    "abq-media": "dist/cli.js"
   },
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
+    "@abquanta/abq-media-core": "^0.2.0",
     "@clack/prompts": "^0.7.0"
   },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
+  },
   "scripts": {
-    "init": "node ./src/cli.js init",
-    "build": "echo 'build cli'",
+    "build": "tsc -p tsconfig.json && cp src/cli.monolith.js dist/cli.monolith.js",
+    "init": "node ./dist/cli.js init",
     "test": "node --test test/smoke.test.js",
-    "lint": "echo 'lint cli'",
-    "clean": "echo 'clean cli'"
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   }
 }

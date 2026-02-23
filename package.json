@@ -1,6 +1,7 @@
 {
   "name": "@abquanta/abq-media-workspace",
   "private": true,
+  "type": "module",
   "version": "0.1.0",
   "description": "Monorepo for Abquanta media intelligence pipeline (YouTube -> transcript -> digest -> research prompt -> podcast/video).",
   "license": "MIT",

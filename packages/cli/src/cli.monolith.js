@@ -5,6 +5,25 @@ import os from 'node:os';
 import readline from 'node:readline';
 import { execSync, spawnSync } from 'node:child_process';
 import * as prompts from '@clack/prompts';
+import {
+  loadConfig as loadCoreConfig,
+  loadDotenv,
+  nowStamp,
+  Pipeline,
+  youtubeIngestStage,
+  captionsStage,
+  textFileIngestStage,
+  audioFileIngestStage,
+  digestStage,
+  researchPromptStage,
+  extractVideoId,
+  generateArticleStage,
+  generatePodcastScriptStage,
+  generateReelScriptStage,
+  generateSocialPostsStage,
+} from '@abquanta/abq-media-core';
+
+loadDotenv();
 
 function arg(flag, fallback = '') {
   const i = process.argv.indexOf(flag);
@@ -284,7 +303,8 @@ function listProjectRuns(projectName) {
       const state = readJson(path.join(runDir, 'state.json')) || { stages: {} };
       const has = (f) => fs.existsSync(path.join(runDir, f));
       return { runDir, source, state, has };
-    });
+    })
+    .filter(({ has }) => has('transcript.txt') || has('source.json') || has('prompt.md'));
 }
 
 function getRunStatePath(runDir) {
@@ -447,6 +467,136 @@ function withSpinner(label, fn) {
 
 function statusNote(message) {
   prompts.log.info(message);
+}
+
+async function withSpinnerAsync(label, fn) {
+  const spin = prompts.spinner();
+  spin.start(label);
+  try {
+    const result = await fn();
+    spin.stop('Done');
+    return result;
+  } catch (err) {
+    spin.stop('Failed');
+    throw err;
+  }
+}
+
+async function runPrepDirect({ url, audioFile, textFile, transcriptFile, lang, captionsOnly, outputDir }) {
+  try {
+    const config = loadCoreConfig({ lang });
+
+    let ingestStage;
+    if (url) {
+      ingestStage = captionsOnly ? captionsStage : youtubeIngestStage;
+    } else if (textFile || transcriptFile) {
+      ingestStage = textFileIngestStage;
+    } else if (audioFile) {
+      ingestStage = audioFileIngestStage;
+    } else {
+      ingestStage = textFileIngestStage;
+    }
+
+    const outDir = outputDir || path.join(
+      path.resolve(process.cwd(), 'packages/pipeline-youtube-research-podcast/output'),
+      `prep-${nowStamp()}`
+    );
+    ensureDir(outDir);
+
+    const pipeline = new Pipeline({
+      name: 'prep',
+      stages: [ingestStage, digestStage, researchPromptStage],
+      config,
+      outputDir: outDir,
+    });
+
+    const videoId = url ? extractVideoId(url) : '';
+    const input = {
+      url: url || undefined,
+      videoId: videoId || undefined,
+      lang,
+      text: undefined,
+      transcriptFile: transcriptFile || textFile || undefined,
+      audioFile: audioFile || undefined,
+    };
+
+    const result = await pipeline.run(input);
+
+    // Enrich metadata
+    const metaPath = path.join(outDir, 'metadata.json');
+    if (fs.existsSync(metaPath)) {
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      Object.assign(meta, {
+        stage: 'prep',
+        source: url ? 'YouTube video' : audioFile ? 'audio file' : 'plain text',
+        url: url || null,
+        videoId: videoId || null,
+        lang,
+      });
+      fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+    }
+
+    return { ok: true, output: `Prep completed: ${outDir}` };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
+async function runPublishDirect({ inputFile, lang, outputDir }) {
+  try {
+    const config = loadCoreConfig({ lang });
+    if (!config.llm.apiKey) {
+      return { ok: false, error: 'LLM API key not configured. Set llmApiKey / OPENROUTER_API_KEY.' };
+    }
+
+    const researchPrompt = fs.readFileSync(inputFile, 'utf8').trim();
+    if (!researchPrompt) {
+      return { ok: false, error: 'Input file is empty.' };
+    }
+
+    const outDir = outputDir || path.join(
+      path.resolve(process.cwd(), 'packages/pipeline-youtube-research-podcast/output'),
+      `publish-${nowStamp()}`
+    );
+    ensureDir(outDir);
+
+    const stages = [
+      generateArticleStage,
+      generatePodcastScriptStage,
+      generateReelScriptStage,
+      generateSocialPostsStage,
+    ];
+
+    const pipeline = new Pipeline({
+      name: 'publish',
+      stages,
+      config,
+      outputDir: outDir,
+    });
+
+    const publishInput = { researchPrompt, lang };
+    const result = await pipeline.run(publishInput);
+
+    // Merge publish metadata with any existing prep metadata
+    const metaPath = path.join(outDir, 'metadata.json');
+    const existingMeta = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, 'utf8')) : {};
+    const publishMeta = {
+      stage: 'publish',
+      inputFile,
+      lang,
+      model: config.llm.model,
+      createdAt: new Date().toISOString(),
+      outputs: {},
+    };
+    for (const stage of result.completedStages) publishMeta.outputs[stage] = 'ok';
+    for (const e of result.errors) publishMeta.outputs[e.stageName] = `error: ${e.error.message}`;
+    existingMeta.publish = publishMeta;
+    fs.writeFileSync(metaPath, JSON.stringify(existingMeta, null, 2));
+
+    return { ok: true, output: `Publish completed: ${outDir}` };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
 }
 
 function renderStageSummary({ runDir, state, promptPath }) {
@@ -618,7 +768,7 @@ function splitSocialPosts(content) {
   };
 }
 
-function exportZipPackage({ projectName, runDir, publishDir }) {
+function exportZipPackage({ projectName, runDir }) {
   if (!hasCmd('zip')) {
     prompts.log.error('zip is not available on this system.');
     return null;
@@ -637,23 +787,21 @@ function exportZipPackage({ projectName, runDir, publishDir }) {
     files.push(summaryDest);
   }
 
-  if (publishDir) {
-    const articleSrc = path.join(publishDir, 'article.md');
-    if (fs.existsSync(articleSrc)) {
-      const articleDest = path.join(workDir, 'article.md');
-      fs.copyFileSync(articleSrc, articleDest);
-      files.push(articleDest);
-    }
-    const socialSrc = path.join(publishDir, 'social_posts.md');
-    if (fs.existsSync(socialSrc)) {
-      const social = fs.readFileSync(socialSrc, 'utf8');
-      const { twitter, linkedin } = splitSocialPosts(social);
-      const twitterDest = path.join(workDir, 'social-twitter.txt');
-      const linkedinDest = path.join(workDir, 'social-linkedin.txt');
-      fs.writeFileSync(twitterDest, twitter.trim() + '\n');
-      fs.writeFileSync(linkedinDest, linkedin.trim() + '\n');
-      files.push(twitterDest, linkedinDest);
-    }
+  const articleSrc = path.join(runDir, 'article.md');
+  if (fs.existsSync(articleSrc)) {
+    const articleDest = path.join(workDir, 'article.md');
+    fs.copyFileSync(articleSrc, articleDest);
+    files.push(articleDest);
+  }
+  const socialSrc = path.join(runDir, 'social_posts.md');
+  if (fs.existsSync(socialSrc)) {
+    const social = fs.readFileSync(socialSrc, 'utf8');
+    const { twitter, linkedin } = splitSocialPosts(social);
+    const twitterDest = path.join(workDir, 'social-twitter.txt');
+    const linkedinDest = path.join(workDir, 'social-linkedin.txt');
+    fs.writeFileSync(twitterDest, twitter.trim() + '\n');
+    fs.writeFileSync(linkedinDest, linkedin.trim() + '\n');
+    files.push(twitterDest, linkedinDest);
   }
 
   const audioSrc = path.join(runDir, 'audio-clean.mp3');
@@ -694,7 +842,6 @@ function exportZipPackage({ projectName, runDir, publishDir }) {
   const meta = {
     project: projectName,
     runDir,
-    publishDir: publishDir || null,
     createdAt: new Date().toISOString()
   };
   const metaDest = path.join(workDir, 'metadata.json');
@@ -758,31 +905,13 @@ async function cmdRun() {
 
   if (!projectName) projectName = 'default';
 
-  let runDir = null;
-  if (!debuggerMode) {
-    const latest = resolveLatestProjectRun(projectName);
-    if (latest) {
-      const existingState = readRunState(latest);
-      const hasIncomplete = existingState && Object.values(existingState.stages || {}).some((v) => v !== 'done');
-      if (hasIncomplete) {
-        const resume = await prompts.confirm({
-          message: 'Resume the last incomplete run?',
-          initialValue: true
-        });
-        if (prompts.isCancel(resume)) return prompts.cancel('Aborted.');
-        if (resume) runDir = latest;
-      }
-    }
-  }
-  if (!runDir) runDir = getProjectRunDir(projectName);
+  let runDir = getProjectRunDir(projectName);
   ensureDir(runDir);
   let state = readRunState(runDir) || initRunState();
   writeRunState(runDir, state);
 
   // Hoisted so both debugger and normal paths can write these before the keepGoing loop
-  let prepDir = null;
   let transcriptDest = '';
-  let lastPublishDir = null;
   let lang = 'es';
   let promptDest = null;
 
@@ -793,9 +922,7 @@ async function cmdRun() {
     writeDebugOutputs(runDir);
     const transcriptPath = path.join(runDir, 'transcript.txt');
     previewMarkdown(transcriptPath);
-    prepDir = runDir;
     transcriptDest = path.join(runDir, 'transcript.txt');
-    lastPublishDir = runDir;
     session.transcript = transcriptDest;
     state.stages.transcribe = 'done';
     state.stages.clean = 'done';
@@ -803,293 +930,290 @@ async function cmdRun() {
     writeRunState(runDir, state);
   } else {
 
-  const inputType = await prompts.select({
-    message: 'Select input type',
-    options: [
-      { value: 'youtube', label: 'YouTube URL' },
-      { value: 'audio', label: 'Audio file' },
-      { value: 'document', label: 'Document (.pdf/.docx) — coming soon' },
-      { value: 'textfile', label: 'Text file' },
-      { value: 'raw', label: 'Raw text' },
-      { value: 'browse', label: 'Browse previous runs' },
-      { value: 'back', label: '⬅ Back' }
-    ]
-  });
-  if (prompts.isCancel(inputType)) return prompts.cancel('Aborted.');
-  if (inputType === 'back') return cmdRun();
-
-  if (inputType === 'browse') {
-    const runs = listProjectRuns(projectName);
-    if (!runs.length) {
-      prompts.log.info('No previous runs found. Start a new input instead.');
-      return cmdRun();
-    }
-    const typeLabel = { youtube: 'YT', audio: 'Audio', textfile: 'File', raw: 'Text' };
-    const runOptions = runs.map(({ runDir: rd, source, has }) => {
-      const type = typeLabel[source.sourceType] || source.sourceType || '?';
-      const src = source.sourceId || path.basename(source.source || '') || 'unknown';
-      const lg = source.lang || '?';
-      const date = (source.createdAt || '').slice(0, 10) || path.basename(rd).slice(0, 10);
-      const badges = [
-        has('transcript.txt')    ? 'transcript' : null,
-        has('prompt.md')         ? 'prompt'     : null,
-        has('article.md')        ? 'article'    : null,
-        has('podcast_script.md') ? 'podcast'    : null,
-        has('reel_script.md')    ? 'reel'       : null,
-      ].filter(Boolean).join(' · ');
-      return { value: rd, label: `[${type}] ${src} (${lg})  ${badges || 'empty'}  ${date}` };
+    const inputType = await prompts.select({
+      message: 'Select input type',
+      options: [
+        { value: 'youtube', label: 'YouTube URL' },
+        { value: 'audio', label: 'Audio file' },
+        { value: 'document', label: 'Document (.pdf/.docx) — coming soon' },
+        { value: 'textfile', label: 'Text file' },
+        { value: 'raw', label: 'Raw text' },
+        { value: 'browse', label: 'Browse previous runs' },
+        { value: 'back', label: '⬅ Back' }
+      ]
     });
-    runOptions.push({ value: '__back__', label: '⬅ Back' });
-    const pick = await prompts.select({ message: 'Select a previous run to load', options: runOptions });
-    if (prompts.isCancel(pick) || pick === '__back__') return cmdRun();
-    const picked = runs.find((r) => r.runDir === pick);
-    if (picked) {
-      runDir = picked.runDir;
-      session.runDir = runDir;
-      state = picked.state;
-      lang = picked.source.lang || 'es';
-      const tPath = path.join(runDir, 'transcript.txt');
-      if (fs.existsSync(tPath)) { transcriptDest = tPath; session.transcript = tPath; }
-      promptDest = fs.existsSync(path.join(runDir, 'prompt.md')) ? path.join(runDir, 'prompt.md') : null;
-      const aPath = path.join(runDir, 'article.md');
-      if (fs.existsSync(aPath)) session.article = aPath;
-      const psPath = path.join(runDir, 'podcast_script.md');
-      if (fs.existsSync(psPath)) session.podcastScript = psPath;
-      const rsPath = path.join(runDir, 'reel_script.md');
-      if (fs.existsSync(rsPath)) session.reelScript = rsPath;
-      const socialPath = path.join(runDir, 'social_posts.md');
-      if (fs.existsSync(socialPath)) session.socialPosts = socialPath;
-      lastPublishDir = resolveLatestPublishDir(process.cwd());
-      prepDir = resolveLatestPrepDir(process.cwd());
-    }
-  } else {
+    if (prompts.isCancel(inputType)) return prompts.cancel('Aborted.');
+    if (inputType === 'back') return cmdRun();
 
-  let inputArg = '';
-  let sourceInfo = { sourceType: inputType, source: '', sourceId: '', lang: '' };
-  if (inputType === 'youtube') {
-    const url = await prompts.text({ message: 'Paste YouTube URL' });
-    if (prompts.isCancel(url) || !url) return prompts.cancel('Aborted.');
-    if (String(url).trim().toLowerCase() === 'back') return cmdRun();
-    inputArg = `--url "${url}"`;
-    sourceInfo.source = String(url).trim();
-    sourceInfo.sourceId = getYouTubeId(sourceInfo.source) || '';
-  } else if (inputType === 'audio') {
-    const p = await prompts.text({ message: 'Path to audio file' });
-    if (prompts.isCancel(p) || !p) return prompts.cancel('Aborted.');
-    if (String(p).trim().toLowerCase() === 'back') return cmdRun();
-    inputArg = `--audio-file "${p}"`;
-    sourceInfo.source = String(p).trim();
-  } else if (inputType === 'document') {
-    prompts.log.info('Document support (.pdf/.docx) is coming soon.');
-    return cmdRun();
-  } else if (inputType === 'textfile') {
-    const p = await prompts.text({ message: 'Path to text file' });
-    if (prompts.isCancel(p) || !p) return prompts.cancel('Aborted.');
-    if (String(p).trim().toLowerCase() === 'back') return cmdRun();
-    inputArg = `--text-file "${p}"`;
-    sourceInfo.source = String(p).trim();
-  } else {
-    const t = await prompts.text({ message: 'Paste text' });
-    if (prompts.isCancel(t) || !t) return prompts.cancel('Aborted.');
-    if (String(t).trim().toLowerCase() === 'back') return cmdRun();
-    const tmp = path.join(os.tmpdir(), `abq-raw-${Date.now()}.txt`);
-    fs.writeFileSync(tmp, t);
-    inputArg = `--text-file "${tmp}"`;
-    sourceInfo.source = 'raw-text';
-  }
-
-  const projectConfig = readJson(getProjectConfigPath(projectName)) || {};
-  const credentials = readJson(getCredentialsPath()) || {};
-  const defaultLang = projectConfig.defaultLanguage || credentials.lang || 'es';
-
-  lang = await prompts.select({
-    message: 'Language',
-    options: [
-      { value: 'es', label: 'Spanish (es)' },
-      { value: 'en', label: 'English (en)' },
-      { value: 'back', label: '⬅ Back' }
-    ],
-    initialValue: defaultLang
-  });
-  if (prompts.isCancel(lang)) return prompts.cancel('Aborted.');
-  if (lang === 'back') return cmdRun();
-  sourceInfo.lang = lang;
-
-  let prepCmd = `npm run yt:prep -- ${inputArg} --lang ${lang}`.trim();
-  let reuse = false;
-  if (inputType === 'youtube') {
-    const existing = findRegistryEntry(projectName, sourceInfo);
-    if (existing && fs.existsSync(existing.transcriptPath)) {
-      const reuseChoice = await prompts.confirm({
-        message: 'Transcript already exists for this video. Reuse it?',
-        initialValue: true
+    if (inputType === 'browse') {
+      const runs = listProjectRuns(projectName);
+      if (!runs.length) {
+        prompts.log.info('No previous runs found. Start a new input instead.');
+        return cmdRun();
+      }
+      const typeLabel = { youtube: 'YT', audio: 'Audio', textfile: 'File', raw: 'Text' };
+      const runOptions = runs.map(({ runDir: rd, source, has }) => {
+        const type = typeLabel[source.sourceType] || source.sourceType || '?';
+        const src = source.sourceId || path.basename(source.source || '') || 'unknown';
+        const lg = source.lang || '?';
+        const date = (source.createdAt || '').slice(0, 10) || path.basename(rd).slice(0, 10);
+        const badges = [
+          has('transcript.txt') ? 'transcript' : null,
+          has('prompt.md') ? 'prompt' : null,
+          has('article.md') ? 'article' : null,
+          has('podcast_script.md') ? 'podcast' : null,
+          has('reel_script.md') ? 'reel' : null,
+        ].filter(Boolean).join(' · ');
+        return { value: rd, label: `[${type}] ${src} (${lg})  ${badges || 'empty'}  ${date}` };
       });
-      if (prompts.isCancel(reuseChoice)) return prompts.cancel('Aborted.');
-      reuse = reuseChoice;
-      if (reuse) {
-        const transcriptDest = path.join(runDir, 'transcript.txt');
-        fs.copyFileSync(existing.transcriptPath, transcriptDest);
-        const meta = {
+      runOptions.push({ value: '__back__', label: '⬅ Back' });
+      const pick = await prompts.select({ message: 'Select a previous run to load', options: runOptions });
+      if (prompts.isCancel(pick) || pick === '__back__') return cmdRun();
+      const picked = runs.find((r) => r.runDir === pick);
+      if (picked) {
+        runDir = picked.runDir;
+        session.runDir = runDir;
+        state = picked.state;
+        lang = picked.source.lang || 'es';
+        const tPath = path.join(runDir, 'transcript.txt');
+        if (fs.existsSync(tPath)) { transcriptDest = tPath; session.transcript = tPath; }
+        promptDest = fs.existsSync(path.join(runDir, 'prompt.md')) ? path.join(runDir, 'prompt.md') : null;
+        const aPath = path.join(runDir, 'article.md');
+        if (fs.existsSync(aPath)) session.article = aPath;
+        const psPath = path.join(runDir, 'podcast_script.md');
+        if (fs.existsSync(psPath)) session.podcastScript = psPath;
+        const rsPath = path.join(runDir, 'reel_script.md');
+        if (fs.existsSync(rsPath)) session.reelScript = rsPath;
+        const socialPath = path.join(runDir, 'social_posts.md');
+        if (fs.existsSync(socialPath)) session.socialPosts = socialPath;
+      }
+    } else {
+
+      let inputArg = '';
+      let rawTmpPath = '';
+      let sourceInfo = { sourceType: inputType, source: '', sourceId: '', lang: '' };
+      if (inputType === 'youtube') {
+        const url = await prompts.text({ message: 'Paste YouTube URL' });
+        if (prompts.isCancel(url) || !url) return prompts.cancel('Aborted.');
+        if (String(url).trim().toLowerCase() === 'back') return cmdRun();
+        inputArg = `--url "${url}"`;
+        sourceInfo.source = String(url).trim();
+        sourceInfo.sourceId = getYouTubeId(sourceInfo.source) || '';
+      } else if (inputType === 'audio') {
+        const p = await prompts.text({ message: 'Path to audio file' });
+        if (prompts.isCancel(p) || !p) return prompts.cancel('Aborted.');
+        if (String(p).trim().toLowerCase() === 'back') return cmdRun();
+        inputArg = `--audio-file "${p}"`;
+        sourceInfo.source = String(p).trim();
+      } else if (inputType === 'document') {
+        prompts.log.info('Document support (.pdf/.docx) is coming soon.');
+        return cmdRun();
+      } else if (inputType === 'textfile') {
+        const p = await prompts.text({ message: 'Path to text file' });
+        if (prompts.isCancel(p) || !p) return prompts.cancel('Aborted.');
+        if (String(p).trim().toLowerCase() === 'back') return cmdRun();
+        inputArg = `--text-file "${p}"`;
+        sourceInfo.source = String(p).trim();
+      } else {
+        const t = await prompts.text({ message: 'Paste text' });
+        if (prompts.isCancel(t) || !t) return prompts.cancel('Aborted.');
+        if (String(t).trim().toLowerCase() === 'back') return cmdRun();
+        const tmp = path.join(os.tmpdir(), `abq-raw-${Date.now()}.txt`);
+        fs.writeFileSync(tmp, t);
+        inputArg = `--text-file "${tmp}"`;
+        rawTmpPath = tmp;
+        sourceInfo.source = 'raw-text';
+      }
+
+      const projectConfig = readJson(getProjectConfigPath(projectName)) || {};
+      const credentials = readJson(getCredentialsPath()) || {};
+      const defaultLang = projectConfig.defaultLanguage || credentials.lang || 'es';
+
+      lang = await prompts.select({
+        message: 'Language',
+        options: [
+          { value: 'es', label: 'Spanish (es)' },
+          { value: 'en', label: 'English (en)' },
+          { value: 'back', label: '⬅ Back' }
+        ],
+        initialValue: defaultLang
+      });
+      if (prompts.isCancel(lang)) return prompts.cancel('Aborted.');
+      if (lang === 'back') return cmdRun();
+      sourceInfo.lang = lang;
+
+      // Build direct pipeline input from collected source info
+      const directInput = {};
+      if (inputType === 'youtube') directInput.url = sourceInfo.source;
+      else if (inputType === 'audio') directInput.audioFile = sourceInfo.source;
+      else if (inputType === 'textfile') directInput.textFile = sourceInfo.source;
+      else directInput.textFile = rawTmpPath || sourceInfo.source;
+
+      let reuse = false;
+      if (inputType === 'youtube') {
+        const existing = findRegistryEntry(projectName, sourceInfo);
+        if (existing && fs.existsSync(existing.transcriptPath)) {
+          const reuseChoice = await prompts.confirm({
+            message: 'Transcript already exists for this video. Reuse it?',
+            initialValue: true
+          });
+          if (prompts.isCancel(reuseChoice)) return prompts.cancel('Aborted.');
+          reuse = reuseChoice;
+          if (reuse) {
+            const transcriptDest = path.join(runDir, 'transcript.txt');
+            fs.copyFileSync(existing.transcriptPath, transcriptDest);
+            const meta = {
+              sourceType: sourceInfo.sourceType,
+              source: sourceInfo.source,
+              sourceId: sourceInfo.sourceId,
+              lang: sourceInfo.lang,
+              reused: true,
+              createdAt: new Date().toISOString()
+            };
+            fs.writeFileSync(path.join(runDir, 'source.json'), JSON.stringify(meta, null, 2));
+          }
+        }
+      }
+
+      if (!reuse) {
+        if (inputType === 'youtube') {
+          prompts.log.info('Checking captions...');
+        } else {
+          prompts.log.info('Running prep...');
+        }
+
+        statusNote('Working on your transcript. This can take a few minutes. Please keep this window open.');
+        let prep = await withSpinnerAsync('Transcribing source...', () =>
+          runPrepDirect({ ...directInput, lang, captionsOnly: inputType === 'youtube', outputDir: runDir }));
+        if (!prep.ok && inputType === 'youtube') {
+          const wantsAsr = await prompts.confirm({
+            message: 'No captions found. Use ASR instead? (dev mode only, may consume credits)',
+            initialValue: true
+          });
+          if (prompts.isCancel(wantsAsr) || !wantsAsr) {
+            prompts.log.error(prep.error || 'Prep failed');
+            return prompts.cancel('Aborted.');
+          }
+          statusNote('ASR is running. This may take several minutes depending on audio length.');
+          prep = await withSpinnerAsync('Transcribing source...', () =>
+            runPrepDirect({ ...directInput, lang, outputDir: runDir }));
+        }
+        if (!prep.ok) {
+          prompts.log.error(prep.error || 'Prep failed');
+          return prompts.cancel('Aborted.');
+        }
+      }
+
+      transcriptDest = path.join(runDir, 'transcript.txt');
+      if (!reuse) {
+        if (!fs.existsSync(transcriptDest)) {
+          prompts.log.error('Transcript not found in prep output.');
+          return prompts.cancel('Aborted.');
+        }
+        fs.writeFileSync(path.join(runDir, 'source.json'), JSON.stringify({
           sourceType: sourceInfo.sourceType,
           source: sourceInfo.source,
           sourceId: sourceInfo.sourceId,
           lang: sourceInfo.lang,
-          reused: true,
+          reused: false,
           createdAt: new Date().toISOString()
-        };
-        fs.writeFileSync(path.join(runDir, 'source.json'), JSON.stringify(meta, null, 2));
+        }, null, 2));
       }
-    }
-  }
+      upsertRegistryEntry(projectName, sourceInfo, transcriptDest);
+      session.transcript = transcriptDest;
+      state.stages.transcribe = 'done';
+      state.updatedAt = new Date().toISOString();
+      writeRunState(runDir, state);
 
-  if (!reuse) {
-    if (inputType === 'youtube') {
-      prompts.log.info('Checking captions...');
-      prepCmd = `${prepCmd} --use-captions`;
-    } else {
-      prompts.log.info('Running prep...');
-    }
-
-    statusNote('Working on your transcript. This can take a few minutes. Please keep this window open.');
-    let prep = withSpinner('Transcribing source...', () => runCommand(prepCmd, { cwd: process.cwd() }));
-    if (!prep.ok && inputType === 'youtube') {
-      const wantsAsr = await prompts.confirm({
-        message: 'No captions found. Use ASR instead? (dev mode only, may consume credits)',
-        initialValue: true
-      });
-      if (prompts.isCancel(wantsAsr) || !wantsAsr) {
-        prompts.log.error(prep.error || 'Prep failed');
-        return prompts.cancel('Aborted.');
+      let gate = true;
+      while (gate) {
+        const action = await prompts.select({
+          message: 'Transcript ready',
+          options: [
+            { value: 'view', label: 'View' },
+            { value: 'edit', label: 'Edit (terminal)' },
+            { value: 'continue', label: 'Continue' },
+            { value: 'back', label: '⬅ Back' }
+          ]
+        });
+        if (prompts.isCancel(action)) return prompts.cancel('Aborted.');
+        if (action === 'back') return cmdRun();
+        if (action === 'view') previewMarkdown(transcriptDest);
+        if (action === 'edit') {
+          const credentials = readJson(getCredentialsPath()) || {};
+          const editorCmd = credentials.editorCommand || '';
+          const ok = openInEditor(transcriptDest, editorCmd);
+          if (!ok) await editInTerminal(transcriptDest);
+        }
+        if (action === 'continue') gate = false;
       }
-      statusNote('ASR is running. This may take several minutes depending on audio length.');
-      prep = withSpinner('Transcribing source...', () => runCommand(`${`npm run yt:prep -- ${inputArg} --lang ${lang}`} --use-asr`, { cwd: process.cwd() }));
-    }
-    if (!prep.ok) {
-      prompts.log.error(prep.error || 'Prep failed');
-      return prompts.cancel('Aborted.');
-    }
-  }
 
-  prepDir = resolveLatestPrepDir(process.cwd());
-  if (!reuse && !prepDir) {
-    prompts.log.error('Prep output not found.');
-    return prompts.cancel('Aborted.');
-  }
-
-  transcriptDest = path.join(runDir, 'transcript.txt');
-  if (!reuse) {
-    const transcriptSrc = path.join(prepDir, 'transcript.txt');
-    if (!fs.existsSync(transcriptSrc)) {
-      prompts.log.error('Transcript not found in prep output.');
-      return prompts.cancel('Aborted.');
-    }
-    fs.copyFileSync(transcriptSrc, transcriptDest);
-    const metaSrc = path.join(prepDir, 'metadata.json');
-    if (fs.existsSync(metaSrc)) fs.copyFileSync(metaSrc, path.join(runDir, 'metadata.json'));
-    fs.writeFileSync(path.join(runDir, 'source.json'), JSON.stringify({
-      sourceType: sourceInfo.sourceType,
-      source: sourceInfo.source,
-      sourceId: sourceInfo.sourceId,
-      lang: sourceInfo.lang,
-      reused: false,
-      createdAt: new Date().toISOString()
-    }, null, 2));
-  }
-  upsertRegistryEntry(projectName, sourceInfo, transcriptDest);
-  session.transcript = transcriptDest;
-  state.stages.transcribe = 'done';
-  state.updatedAt = new Date().toISOString();
-  writeRunState(runDir, state);
-
-  let gate = true;
-  while (gate) {
-    const action = await prompts.select({
-      message: 'Transcript ready',
-      options: [
-        { value: 'view', label: 'View' },
-        { value: 'edit', label: 'Edit (terminal)' },
-        { value: 'continue', label: 'Continue' },
-        { value: 'back', label: '⬅ Back' }
-      ]
-    });
-    if (prompts.isCancel(action)) return prompts.cancel('Aborted.');
-    if (action === 'back') return cmdRun();
-    if (action === 'view') previewMarkdown(transcriptDest);
-    if (action === 'edit') {
-      const credentials = readJson(getCredentialsPath()) || {};
-      const editorCmd = credentials.editorCommand || '';
-      const ok = openInEditor(transcriptDest, editorCmd);
-      if (!ok) await editInTerminal(transcriptDest);
-    }
-    if (action === 'continue') gate = false;
-  }
-
-  const cleanDest = path.join(runDir, 'clean.txt');
-  if (state.stages.clean !== 'done') {
-    fs.copyFileSync(transcriptDest, cleanDest);
-    let cleanGate = true;
-    while (cleanGate) {
-      const action = await prompts.select({
-        message: 'Cleaned transcript',
-        options: [
-          { value: 'view', label: 'View' },
-          { value: 'edit', label: 'Edit (terminal)' },
-          { value: 'continue', label: 'Continue' },
-          { value: 'back', label: '⬅ Back' }
-        ]
-      });
-      if (prompts.isCancel(action)) return prompts.cancel('Aborted.');
-      if (action === 'back') return cmdRun();
-      if (action === 'view') previewMarkdown(cleanDest);
-      if (action === 'edit') {
-        const credentials = readJson(getCredentialsPath()) || {};
-        const editorCmd = credentials.editorCommand || '';
-        const ok = openInEditor(cleanDest, editorCmd);
-        if (!ok) await editInTerminal(cleanDest);
+      const cleanDest = path.join(runDir, 'clean.txt');
+      if (state.stages.clean !== 'done') {
+        fs.copyFileSync(transcriptDest, cleanDest);
+        let cleanGate = true;
+        while (cleanGate) {
+          const action = await prompts.select({
+            message: 'Cleaned transcript',
+            options: [
+              { value: 'view', label: 'View' },
+              { value: 'edit', label: 'Edit (terminal)' },
+              { value: 'continue', label: 'Continue' },
+              { value: 'back', label: '⬅ Back' }
+            ]
+          });
+          if (prompts.isCancel(action)) return prompts.cancel('Aborted.');
+          if (action === 'back') return cmdRun();
+          if (action === 'view') previewMarkdown(cleanDest);
+          if (action === 'edit') {
+            const credentials = readJson(getCredentialsPath()) || {};
+            const editorCmd = credentials.editorCommand || '';
+            const ok = openInEditor(cleanDest, editorCmd);
+            if (!ok) await editInTerminal(cleanDest);
+          }
+          if (action === 'continue') cleanGate = false;
+        }
+        state.stages.clean = 'done';
+        state.updatedAt = new Date().toISOString();
+        writeRunState(runDir, state);
       }
-      if (action === 'continue') cleanGate = false;
-    }
-    state.stages.clean = 'done';
-    state.updatedAt = new Date().toISOString();
-    writeRunState(runDir, state);
-  }
 
-  const summaryDest = path.join(runDir, 'summary.txt');
-  if (state.stages.summarize !== 'done') {
-    const digestSrc = prepDir ? path.join(prepDir, 'digest.md') : null;
-    if (digestSrc && fs.existsSync(digestSrc)) {
-      fs.copyFileSync(digestSrc, summaryDest);
-    } else {
-      fs.writeFileSync(summaryDest, fs.readFileSync(cleanDest, 'utf8'));
-    }
-    let summaryGate = true;
-    while (summaryGate) {
-      const action = await prompts.select({
-        message: 'Summary ready',
-        options: [
-          { value: 'view', label: 'View' },
-          { value: 'edit', label: 'Edit (terminal)' },
-          { value: 'continue', label: 'Continue' },
-          { value: 'back', label: '⬅ Back' }
-        ]
-      });
-      if (prompts.isCancel(action)) return prompts.cancel('Aborted.');
-      if (action === 'back') return cmdRun();
-      if (action === 'view') previewMarkdown(summaryDest);
-      if (action === 'edit') {
-        const credentials = readJson(getCredentialsPath()) || {};
-        const editorCmd = credentials.editorCommand || '';
-        const ok = openInEditor(summaryDest, editorCmd);
-        if (!ok) await editInTerminal(summaryDest);
+      const summaryDest = path.join(runDir, 'summary.txt');
+      if (state.stages.summarize !== 'done') {
+        const digestSrc = path.join(runDir, 'digest.md');
+        if (fs.existsSync(digestSrc)) {
+          fs.copyFileSync(digestSrc, summaryDest);
+        } else {
+          fs.writeFileSync(summaryDest, fs.readFileSync(cleanDest, 'utf8'));
+        }
+        let summaryGate = true;
+        while (summaryGate) {
+          const action = await prompts.select({
+            message: 'Summary ready',
+            options: [
+              { value: 'view', label: 'View' },
+              { value: 'edit', label: 'Edit (terminal)' },
+              { value: 'continue', label: 'Continue' },
+              { value: 'back', label: '⬅ Back' }
+            ]
+          });
+          if (prompts.isCancel(action)) return prompts.cancel('Aborted.');
+          if (action === 'back') return cmdRun();
+          if (action === 'view') previewMarkdown(summaryDest);
+          if (action === 'edit') {
+            const credentials = readJson(getCredentialsPath()) || {};
+            const editorCmd = credentials.editorCommand || '';
+            const ok = openInEditor(summaryDest, editorCmd);
+            if (!ok) await editInTerminal(summaryDest);
+          }
+          if (action === 'continue') summaryGate = false;
+        }
+        state.stages.summarize = 'done';
+        state.updatedAt = new Date().toISOString();
+        writeRunState(runDir, state);
       }
-      if (action === 'continue') summaryGate = false;
-    }
-    state.stages.summarize = 'done';
-    state.updatedAt = new Date().toISOString();
-    writeRunState(runDir, state);
-  }
 
-  } // end else (new input path)
+    } // end else (new input path)
   } // end else (!debuggerMode) — input collection and prep
 
   let keepGoing = true;
@@ -1126,11 +1250,11 @@ async function cmdRun() {
 
     if (next === 'done') {
       const summaryLines = [
-        session.transcript    ? '✓ Transcript'    : null,
-        session.article       ? '✓ Article'        : null,
+        session.transcript ? '✓ Transcript' : null,
+        session.article ? '✓ Article' : null,
         session.podcastScript ? '✓ Podcast script' : null,
-        session.reelScript    ? '✓ Reel script'    : null,
-        session.socialPosts   ? '✓ Social posts'   : null,
+        session.reelScript ? '✓ Reel script' : null,
+        session.socialPosts ? '✓ Social posts' : null,
         state.stages.tts === 'done' ? '✓ Audio (MP3)' : null,
       ].filter(Boolean);
       if (summaryLines.length) {
@@ -1158,10 +1282,10 @@ async function cmdRun() {
         const date = (source.createdAt || '').slice(0, 10) || path.basename(rd).slice(0, 10);
         const badges = [
           has('transcript.txt') ? 'transcript' : null,
-          has('prompt.md')      ? 'prompt'     : null,
-          has('article.md')     ? 'article'    : null,
+          has('prompt.md') ? 'prompt' : null,
+          has('article.md') ? 'article' : null,
           has('podcast_script.md') ? 'podcast' : null,
-          has('reel_script.md') ? 'reel'       : null,
+          has('reel_script.md') ? 'reel' : null,
         ].filter(Boolean).join(' · ');
         return { value: rd, label: `[${type}] ${src} (${lang})  ${badges || 'empty'}  ${date}` };
       });
@@ -1195,9 +1319,6 @@ async function cmdRun() {
       const socialPath = path.join(runDir, 'social_posts.md');
       if (fs.existsSync(socialPath)) session.socialPosts = socialPath;
 
-      lastPublishDir = resolveLatestPublishDir(process.cwd());
-      prepDir = resolveLatestPrepDir(process.cwd());
-
       prompts.log.success(`Loaded: ${path.basename(runDir)}`);
       continue;
     }
@@ -1218,7 +1339,7 @@ async function cmdRun() {
     }
 
     if (next === 'export_zip') {
-      const exportResult = exportZipPackage({ projectName, runDir, publishDir: lastPublishDir });
+      const exportResult = exportZipPackage({ projectName, runDir });
       if (!exportResult) {
         prompts.log.error('Export failed.');
         continue;
@@ -1275,38 +1396,55 @@ async function cmdRun() {
     }
 
     if (next === 'podcast_script' || next === 'reel_script') {
-      if (!lastPublishDir) {
+      const outputFile = next === 'podcast_script' ? 'podcast_script.md' : 'reel_script.md';
+      // If not already generated, run prep + publish into runDir
+      if (!fs.existsSync(path.join(runDir, outputFile))) {
         if (!promptDest || !fs.existsSync(promptDest)) {
-          prompts.log.warn('Generate the deep research prompt first.');
-          continue;
+          // Auto-generate the research prompt from the best available source
+          const bestSource = [
+            path.join(runDir, 'summary.txt'),
+            path.join(runDir, 'clean.txt'),
+            transcriptDest,
+          ].find(f => f && fs.existsSync(f) && fs.readFileSync(f, 'utf8').trim().length > 0);
+
+          if (!bestSource) {
+            prompts.log.warn('No transcript or summary found to generate prompt from.');
+            continue;
+          }
+
+          statusNote(`Generating research prompt from ${path.basename(bestSource)}…`);
+          const promptPrep = await withSpinnerAsync('Generating research prompt...', () =>
+            runPrepDirect({ transcriptFile: bestSource, lang, outputDir: runDir }));
+          if (!promptPrep.ok) {
+            prompts.log.error(promptPrep.error || 'Prompt generation failed');
+            continue;
+          }
+          const pSrc = path.join(runDir, 'deep_research_prompt.md');
+          if (fs.existsSync(pSrc)) {
+            promptDest = path.join(runDir, 'prompt.md');
+            fs.copyFileSync(pSrc, promptDest);
+          }
+          if (!promptDest || !fs.existsSync(promptDest)) {
+            prompts.log.warn('Prompt generation completed but output not found.');
+            continue;
+          }
         }
         statusNote('Generating scripts. This can take a minute.');
-        const publishCmd = `npm run yt:publish -- --input "${promptDest}" --lang ${lang}`;
-        const pub = withSpinner('Generating content...', () => runCommand(publishCmd, { cwd: process.cwd() }));
+        const pub = await withSpinnerAsync('Generating content...', () =>
+          runPublishDirect({ inputFile: promptDest, lang, outputDir: runDir }));
         if (!pub.ok) {
           prompts.log.error(pub.error || 'Generation failed');
           continue;
         }
-        lastPublishDir = resolveLatestPublishDir(process.cwd());
-        if (!lastPublishDir) {
-          prompts.log.error('Publish output not found.');
-          continue;
+        if (fs.existsSync(path.join(runDir, 'article.md')) && !session.article) {
+          session.article = path.join(runDir, 'article.md');
         }
-        const articleSrc = path.join(lastPublishDir, 'article.md');
-        if (fs.existsSync(articleSrc) && !session.article) {
-          const articleDest = path.join(runDir, 'article.md');
-          fs.copyFileSync(articleSrc, articleDest);
-          session.article = articleDest;
-        }
-      }
-      const outputFile = next === 'podcast_script' ? 'podcast_script.md' : 'reel_script.md';
-      const outputSrc = path.join(lastPublishDir, outputFile);
-      if (!fs.existsSync(outputSrc)) {
-        prompts.log.warn(`${outputFile} not found in publish output.`);
-        continue;
       }
       const outputDest = path.join(runDir, outputFile);
-      fs.copyFileSync(outputSrc, outputDest);
+      if (!fs.existsSync(outputDest)) {
+        prompts.log.warn(`${outputFile} not found in output.`);
+        continue;
+      }
       if (next === 'podcast_script') session.podcastScript = outputDest;
       else session.reelScript = outputDest;
 
@@ -1338,19 +1476,28 @@ async function cmdRun() {
     }
 
     if (next === 'prompt' || next === 'article') {
-      let promptSourceDir = prepDir;
-      if (!promptSourceDir) {
-        const promptPrepCmd = `npm run yt:prep -- --transcript-file "${transcriptDest}" --lang ${lang}`;
-        statusNote('Generating the research prompt. This can take a minute.');
-        const promptPrep = withSpinner('Generating research prompt...', () => runCommand(promptPrepCmd, { cwd: process.cwd() }));
-        if (!promptPrep.ok) {
-          prompts.log.error(promptPrep.error || 'Prompt generation failed');
-          return prompts.cancel('Aborted.');
-        }
-        promptSourceDir = resolveLatestPrepDir(process.cwd());
+      // Always (re-)generate the research prompt from the most refined user-edited file.
+      // Priority: summary.txt > clean.txt > transcript.txt
+      const bestSource = [
+        path.join(runDir, 'summary.txt'),
+        path.join(runDir, 'clean.txt'),
+        transcriptDest,
+      ].find(f => f && fs.existsSync(f) && fs.readFileSync(f, 'utf8').trim().length > 0);
+
+      if (!bestSource) {
+        prompts.log.error('No transcript or summary found to generate prompt from.');
+        return prompts.cancel('Aborted.');
       }
 
-      const promptSrc = path.join(promptSourceDir, 'deep_research_prompt.md');
+      statusNote(`Generating research prompt from ${path.basename(bestSource)}…`);
+      const promptPrep = await withSpinnerAsync('Generating research prompt...', () =>
+        runPrepDirect({ transcriptFile: bestSource, lang, outputDir: runDir }));
+      if (!promptPrep.ok) {
+        prompts.log.error(promptPrep.error || 'Prompt generation failed');
+        return prompts.cancel('Aborted.');
+      }
+
+      const promptSrc = path.join(runDir, 'deep_research_prompt.md');
       if (!fs.existsSync(promptSrc)) {
         prompts.log.error('Deep research prompt not found in prep output.');
         return prompts.cancel('Aborted.');
@@ -1449,27 +1596,21 @@ async function cmdRun() {
         const tempPrompt = path.join(runDir, 'prompt_render.md');
         fs.writeFileSync(tempPrompt, promptForPublish);
 
-        const publishCmd = `npm run yt:publish -- --input "${tempPrompt}" --lang ${lang}`;
         statusNote('Generating the article. This can take a minute.');
-        const pub = withSpinner('Generating content...', () => runCommand(publishCmd, { cwd: process.cwd() }));
+        const pub = await withSpinnerAsync('Generating content...', () =>
+          runPublishDirect({ inputFile: tempPrompt, lang, outputDir: runDir }));
         if (!pub.ok) {
           prompts.log.error(pub.error || 'Publish failed');
           return prompts.cancel('Aborted.');
         }
 
-        const publishDir = resolveLatestPublishDir(process.cwd());
-        if (!publishDir) {
-          prompts.log.error('Publish output not found.');
-          return prompts.cancel('Aborted.');
-        }
-        const articleSrc = path.join(publishDir, 'article.md');
-        if (!fs.existsSync(articleSrc)) {
+        const articlePath = path.join(runDir, 'article.md');
+        if (!fs.existsSync(articlePath)) {
           prompts.log.error('Article not found in publish output.');
           return prompts.cancel('Aborted.');
         }
-        previewMarkdown(articleSrc);
-        lastArticle = articleSrc;
-        lastPublishDir = publishDir;
+        previewMarkdown(articlePath);
+        lastArticle = articlePath;
 
         const decision = await prompts.select({
           message: 'Approve this article?',
@@ -1523,13 +1664,11 @@ async function cmdRun() {
           social_posts: 'social_posts.md'
         };
         const outputFile = outputFiles[otherOutput];
-        const outputSrc = path.join(lastPublishDir, outputFile);
-        if (!fs.existsSync(outputSrc)) {
-          prompts.log.warn(`${outputFile} not found in publish output.`);
+        const outputDest = path.join(runDir, outputFile);
+        if (!fs.existsSync(outputDest)) {
+          prompts.log.warn(`${outputFile} not found in output.`);
           continue;
         }
-        const outputDest = path.join(runDir, outputFile);
-        fs.copyFileSync(outputSrc, outputDest);
         if (otherOutput === 'podcast_script') session.podcastScript = outputDest;
         else if (otherOutput === 'reel_script') session.reelScript = outputDest;
         else if (otherOutput === 'social_posts') session.socialPosts = outputDest;
