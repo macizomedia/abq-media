@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 
-const CLI = path.resolve(import.meta.dirname, '../src/cli.js');
+const CLI = path.resolve(import.meta.dirname, '../dist/cli.js');
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'abq-cli-'));
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'abq-home-'));
 const baseEnv = { ...process.env, HOME: home };
