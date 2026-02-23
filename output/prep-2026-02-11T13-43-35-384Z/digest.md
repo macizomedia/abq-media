@@ -1,3 +1,0 @@
-# Main Talking Points
-
-- TODO
