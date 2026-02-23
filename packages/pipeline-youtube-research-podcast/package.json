@@ -43,5 +43,8 @@
   "bugs": {
     "url": "https://github.com/abquanta/pipeline-youtube-research-podcast/issues"
   },
-  "homepage": "https://github.com/abquanta/pipeline-youtube-research-podcast#readme"
+  "homepage": "https://github.com/abquanta/pipeline-youtube-research-podcast#readme",
+  "dependencies": {
+    "@abquanta/abq-media-core": "^0.2.0"
+  }
 }
