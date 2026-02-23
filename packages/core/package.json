@@ -1,14 +1,32 @@
 {
   "name": "@abquanta/abq-media-core",
-  "version": "0.1.0",
-  "description": "Core contracts and pipeline types for Abquanta media workflows.",
+  "version": "0.2.0",
+  "description": "Core contracts, pipeline runner, and typed stage system for Abquanta media workflows.",
   "type": "module",
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "echo 'build core'",
-    "test": "echo 'test core'",
-    "lint": "echo 'lint core'",
-    "clean": "echo 'clean core'"
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.js",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "typescript": "^5.9.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0"
   }
 }
