@@ -27,6 +27,37 @@ export function getCredentialsPath(): string {
   return path.join(getGlobalDir(), 'credentials.json');
 }
 
+/** `~/abq-projects/` */
+export function getProjectsRootDir(cwd = process.cwd()): string {
+  return path.resolve(cwd, 'abq-projects');
+}
+
+/** Expand `~` and resolve relative paths against `cwd`. */
+export function resolvePathFromCwd(input: string, cwd = process.cwd()): string {
+  const trimmed = input.trim();
+  if (!trimmed) return cwd;
+
+  let expanded = trimmed;
+  if (trimmed === '~') {
+    expanded = os.homedir();
+  } else if (trimmed.startsWith('~/')) {
+    expanded = path.join(os.homedir(), trimmed.slice(2));
+  }
+
+  return path.isAbsolute(expanded) ? path.normalize(expanded) : path.resolve(cwd, expanded);
+}
+
+/**
+ * Resolve projects root using configured output dir when available.
+ * Falls back to `./abq-projects` from the active working directory.
+ */
+export function resolveProjectsRootDir(configuredOutputDir?: string, cwd = process.cwd()): string {
+  if (configuredOutputDir?.trim()) {
+    return resolvePathFromCwd(configuredOutputDir, cwd);
+  }
+  return getProjectsDir();
+}
+
 /** `~/.abq-media/projects/` */
 export function getProjectsDir(): string {
   return path.join(getGlobalDir(), 'projects');

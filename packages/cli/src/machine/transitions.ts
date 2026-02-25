@@ -49,9 +49,9 @@ export const TRANSITIONS: TransitionMap = {
     }
   },
 
-  INPUT_YOUTUBE: ['TRANSCRIPTION'],
-  INPUT_AUDIO: ['TRANSCRIPTION'],
-  INPUT_TEXT: ['PROCESSING_SELECT'],   // skip transcription
+  INPUT_YOUTUBE: ['TRANSCRIPTION', 'INPUT_SELECT'],
+  INPUT_AUDIO: ['TRANSCRIPTION', 'INPUT_SELECT'],
+  INPUT_TEXT: ['PROCESSING_SELECT', 'INPUT_SELECT'],   // skip transcription
 
   // ── Transcription ───────────────────────────────────────────────────
 
@@ -60,31 +60,8 @@ export const TRANSITIONS: TransitionMap = {
 
   // ── Processing routing ──────────────────────────────────────────────
 
-  PROCESSING_SELECT: (ctx: CLIContext): State => {
-    switch (ctx.processingType) {
-      case 'prompt':
-      case 'article':
-        return 'RESEARCH_PROMPT_GEN';
-
-      case 'podcast_script':
-      case 'reel_script':
-        return 'SCRIPT_GENERATE';
-
-      case 'translate':
-        return 'TRANSLATE';
-
-      case 'export':
-      case 'export_zip':
-        return 'PACKAGE';
-
-      default:
-        throw new ValidationError(
-          `Unknown processingType '${ctx.processingType}' at PROCESSING_SELECT`,
-          'processingType',
-          ctx.processingType,
-        );
-    }
-  },
+  // Routing logic lives in the handler — transition map validates containment only.
+  PROCESSING_SELECT: ['RESEARCH_PROMPT_GEN', 'SCRIPT_GENERATE', 'TRANSLATE', 'PACKAGE', 'COMPLETE'],
 
   // ── Research flow ───────────────────────────────────────────────────
 
@@ -104,8 +81,8 @@ export const TRANSITIONS: TransitionMap = {
 
   ARTICLE_REVIEW: (ctx: CLIContext): State => {
     const attempts = ctx.articleAttempts ?? 0;
-    // If last error indicates a retry request AND we haven't exhausted retries:
-    if (ctx.lastError && attempts < 3) return 'ARTICLE_GENERATE';
+    // If user requested a retry AND we haven't exhausted retries:
+    if (ctx.articleRetryRequested && attempts < 3) return 'ARTICLE_GENERATE';
     // Otherwise (approved or max retries): move on.
     return 'OUTPUT_SELECT';
   },
@@ -116,28 +93,14 @@ export const TRANSITIONS: TransitionMap = {
 
   // ── Output routing ──────────────────────────────────────────────────
 
-  OUTPUT_SELECT: (ctx: CLIContext): State => {
-    switch (ctx.outputType) {
-      case 'podcast': return 'SCRIPT_GENERATE';
-      case 'article': return 'ARTICLE_GENERATE';
-      case 'social_kit':
-      case 'export_zip': return 'PACKAGE';
-      default:
-        throw new ValidationError(
-          `Unknown outputType '${ctx.outputType}' at OUTPUT_SELECT`,
-          'outputType',
-          ctx.outputType,
-        );
-    }
-  },
+  // Routing logic lives in the handler — transition map validates containment only.
+  OUTPUT_SELECT: ['SCRIPT_GENERATE', 'ARTICLE_GENERATE', 'PACKAGE', 'COMPLETE'],
 
   // ── Script + TTS flow ──────────────────────────────────────────────
 
-  SCRIPT_GENERATE: (ctx: CLIContext): State => {
-    // Podcast scripts proceed to TTS; reel scripts go straight to package.
-    if (ctx.outputType === 'podcast') return 'TTS_RENDER';
-    return 'PACKAGE';
-  },
+  // Routing logic lives in the handler — transition map validates containment only.
+  // TTS_RENDER for podcast, PACKAGE for reel, OUTPUT_SELECT on failure fallback.
+  SCRIPT_GENERATE: ['TTS_RENDER', 'PACKAGE', 'OUTPUT_SELECT'],
 
   TTS_RENDER: ['PACKAGE'],
 

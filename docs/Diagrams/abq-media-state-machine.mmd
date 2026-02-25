@@ -1,0 +1,59 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#4caf50', 'primaryTextColor': '#fff', 'primaryBorderColor': '#2e7d32', 'lineColor': '#90a4ae', 'secondaryColor': '#ff9800', 'tertiaryColor': '#2196f3'}}}%%
+
+stateDiagram-v2
+    [*] --> PROJECT_INIT: abq-media transform
+
+    PROJECT_INIT --> INPUT_SELECT: ctx.projectName
+
+    state "🎯 Input Detection" as input_choice {
+        INPUT_SELECT --> INPUT_YOUTUBE: youtube
+        INPUT_SELECT --> INPUT_AUDIO: audio
+        INPUT_SELECT --> INPUT_TEXT: text/file
+
+    INPUT_YOUTUBE --> TRANSCRIPTION: yt-dlp + captions
+    INPUT_AUDIO --> TRANSCRIPTION: whisper
+    INPUT_TEXT --> PROCESSING_SELECT: direct
+
+    TRANSCRIPTION --> PROCESSING_SELECT: ctx.transcript
+
+    state "⚙️ Processing Path" as process_choice {
+        PROCESSING_SELECT --> RESEARCH_PROMPT_GEN: research
+        PROCESSING_SELECT --> ARTICLE_GENERATE: article
+        PROCESSING_SELECT --> TRANSLATE: translate
+        PROCESSING_SELECT --> SCRIPT_GENERATE: script
+        PROCESSING_SELECT --> OUTPUT_SELECT: raw
+    }
+
+    RESEARCH_PROMPT_GEN --> RESEARCH_EXECUTE: ctx.researchPrompt
+
+    note right of RESEARCH_EXECUTE
+        🔴 This was the missing stage!
+        Now executes LLM and produces ctx.report
+    end note
+
+    RESEARCH_EXECUTE --> OUTPUT_SELECT: ctx.report
+    ARTICLE_GENERATE --> OUTPUT_SELECT: ctx.article
+    TRANSLATE --> OUTPUT_SELECT: ctx.translatedText
+
+    state "📤 Output Generation" as output_choice {
+        OUTPUT_SELECT --> SCRIPT_GENERATE: podcast
+        OUTPUT_SELECT --> VIDEO_SCRIPT_GENERATE: video
+        OUTPUT_SELECT --> PACKAGE: article/kit
+    }
+
+    SCRIPT_GENERATE --> TTS_ELEVENLABS: ctx.podcastScript
+    VIDEO_SCRIPT_GENERATE --> PACKAGE: ctx.videoScript
+    TTS_ELEVENLABS --> PACKAGE: ctx.audioPath
+
+    PACKAGE --> COMPLETE: ctx.zipPath
+    COMPLETE --> [*]
+
+    %% Error States
+    state "❌ Error Handling" as error_zone {
+        ERROR: Checkpoint Saved
+    }
+
+    TRANSCRIPTION --> ERROR: whisper fail
+    RESEARCH_EXECUTE --> ERROR: LLM timeout
+    TTS_ELEVENLABS --> ERROR: rate limit
+    ERROR --> [*]: abq-media continue

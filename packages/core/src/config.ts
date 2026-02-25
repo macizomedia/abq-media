@@ -68,6 +68,70 @@ export const OutputConfigSchema = z.object({
     .default(['article', 'podcast_script', 'reel_script', 'social_posts']),
 });
 
+export const YtdlpWorkaroundsSchema = z.object({
+  /** Force connections through IPv4. Maps to --force-ipv4. */
+  forceIpv4: z.boolean().default(false),
+  /** Bypass geographic restriction via faking X-Forwarded-For. Maps to --geo-bypass. */
+  geoBypass: z.boolean().default(false),
+  /** Seconds to sleep between requests. Maps to --sleep-interval. */
+  sleepInterval: z.number().int().min(0).default(0),
+  /** Seconds to sleep between subtitle requests. Maps to --sleep-subtitles. */
+  sleepSubtitles: z.number().int().min(0).default(0),
+  /** Number of retries for a download. Maps to --retries. */
+  retries: z.number().int().min(0).default(10),
+  /** Number of retries for a fragment. Maps to --fragment-retries. */
+  fragmentRetries: z.number().int().min(0).default(10),
+}).default({
+  forceIpv4: false,
+  geoBypass: false,
+  sleepInterval: 0,
+  sleepSubtitles: 0,
+  retries: 10,
+  fragmentRetries: 10,
+});
+
+export const YtdlpConfigSchema = z.object({
+  /** Verbosity level for yt-dlp output.
+   *  - quiet:   --quiet (suppress most output)
+   *  - normal:  no flag (default yt-dlp behaviour)
+   *  - verbose: --verbose (print various debugging info)
+   *  - debug:   --verbose --print-traffic (full protocol dump)
+   */
+  verbosity: z.enum(['quiet', 'normal', 'verbose', 'debug']).default('normal'),
+  /** When true, run yt-dlp with --simulate --dump-json — no downloads, returns metadata only. */
+  simulate: z.boolean().default(false),
+  /** Workaround flags for network and geo issues. */
+  workarounds: YtdlpWorkaroundsSchema,
+  /** Format selector string. Maps to --format / -f. Default varies by purpose. */
+  format: z.string().optional(),
+  /** Target audio format for post-processing. Maps to --audio-format. */
+  audioFormat: z.enum(['mp3', 'wav', 'opus', 'aac', 'flac', 'best']).default('mp3'),
+  /** Audio quality for post-processing. Maps to --audio-quality (0=best, 10=worst). */
+  audioQuality: z.number().int().min(0).max(10).default(5),
+  /** Raw --postprocessor-args strings, e.g. ["FFmpeg:-ac 1 -ar 16000"]. */
+  postProcessorArgs: z.array(z.string()).default([]),
+  /** Path to a Netscape-format cookies file. Maps to --cookies. */
+  cookies: z.string().optional(),
+  /** Browser to extract cookies from. Maps to --cookies-from-browser.
+   *  Values: 'chrome', 'firefox', 'safari', 'edge', 'opera', 'brave', 'chromium', 'vivaldi'
+   *  Can include profile: 'chrome:Profile 1' */
+  cookiesFromBrowser: z.string().optional(),
+  /** JS runtime spec for yt-dlp challenges. Maps to --js-runtimes. */
+  jsRuntimes: z.string().optional(),
+  /** HTTP/SOCKS proxy URL. Maps to --proxy. */
+  proxy: z.string().optional(),
+  /** Download rate limit, e.g. "50K" or "4.2M". Maps to --limit-rate. */
+  rateLimit: z.string().optional(),
+  /** Preferred subtitle format. Maps to --sub-format. */
+  subtitleFormat: z.enum(['vtt', 'srt', 'ass', 'best']).default('vtt'),
+  /** Override subtitle language list (BCP-47 codes). Merged with config.lang at runtime. */
+  subtitleLangs: z.array(z.string()).default([]),
+  /** Timeout in ms for subtitle-download commands. */
+  subtitleTimeoutMs: z.number().int().positive().default(60_000),
+  /** Timeout in ms for audio-download commands. */
+  audioTimeoutMs: z.number().int().positive().default(300_000),
+});
+
 // ---------------------------------------------------------------------------
 // Root schema
 // ---------------------------------------------------------------------------
@@ -82,6 +146,7 @@ export const PipelineConfigSchema = z.object({
   tts: TTSConfigSchema.default(() => TTSConfigSchema.parse({})),
   transcript: TranscriptConfigSchema.default(() => TranscriptConfigSchema.parse({})),
   output: OutputConfigSchema.default(() => OutputConfigSchema.parse({})),
+  ytdlp: YtdlpConfigSchema.default(() => YtdlpConfigSchema.parse({})),
 });
 
 export type PipelineConfig = z.infer<typeof PipelineConfigSchema>;
@@ -90,6 +155,8 @@ export type ASRConfig = z.infer<typeof ASRConfigSchema>;
 export type TTSConfig = z.infer<typeof TTSConfigSchema>;
 export type TranscriptConfig = z.infer<typeof TranscriptConfigSchema>;
 export type OutputConfig = z.infer<typeof OutputConfigSchema>;
+export type YtdlpConfig = z.infer<typeof YtdlpConfigSchema>;
+export type YtdlpWorkarounds = z.infer<typeof YtdlpWorkaroundsSchema>;
 
 // ---------------------------------------------------------------------------
 // Config loader
@@ -196,6 +263,12 @@ function normalizeCredentials(raw: Record<string, unknown>): Record<string, unkn
   if (raw.elevenLabsApiKey) tts.apiKey = raw.elevenLabsApiKey;
   if (Object.keys(tts).length) out.tts = tts;
 
+  const ytdlp: Record<string, unknown> = {};
+  if (raw.ytdlpCookies) ytdlp.cookies = raw.ytdlpCookies;
+  if (raw.ytdlpCookiesFromBrowser) ytdlp.cookiesFromBrowser = raw.ytdlpCookiesFromBrowser;
+  if (raw.ytdlpJsRuntimes) ytdlp.jsRuntimes = raw.ytdlpJsRuntimes;
+  if (Object.keys(ytdlp).length) out.ytdlp = ytdlp;
+
   return out;
 }
 
@@ -210,14 +283,30 @@ function envLayer(): Record<string, unknown> {
   if (process.env.OPENAI_API_KEY) {
     llm.apiKey ??= process.env.OPENAI_API_KEY;
     asr.apiKey = process.env.OPENAI_API_KEY;
+    if (!process.env.OPENROUTER_API_KEY) {
+      llm.provider = 'openai';
+    }
   }
   if (process.env.ELEVENLABS_API_KEY) tts.apiKey = process.env.ELEVENLABS_API_KEY;
   if (process.env.ABQ_DEBUG === '1') out.debug = true;
   if (process.env.ABQ_LANG) out.lang = process.env.ABQ_LANG;
 
+  // yt-dlp
+  const ytdlp: Record<string, unknown> = {};
+  if (process.env.YTDLP_VERBOSITY) ytdlp.verbosity = process.env.YTDLP_VERBOSITY;
+  if (process.env.YTDLP_SIMULATE === '1') ytdlp.simulate = true;
+  if (process.env.YTDLP_COOKIES) ytdlp.cookies = process.env.YTDLP_COOKIES;
+  if (process.env.YTDLP_COOKIES_FROM_BROWSER) ytdlp.cookiesFromBrowser = process.env.YTDLP_COOKIES_FROM_BROWSER;
+  if (process.env.YTDLP_JS_RUNTIMES) ytdlp.jsRuntimes = process.env.YTDLP_JS_RUNTIMES;
+  if (process.env.YTDLP_PROXY) ytdlp.proxy = process.env.YTDLP_PROXY;
+  if (process.env.YTDLP_RATE_LIMIT) ytdlp.rateLimit = process.env.YTDLP_RATE_LIMIT;
+  if (process.env.YTDLP_AUDIO_FORMAT) ytdlp.audioFormat = process.env.YTDLP_AUDIO_FORMAT;
+  if (process.env.YTDLP_SUBTITLE_FORMAT) ytdlp.subtitleFormat = process.env.YTDLP_SUBTITLE_FORMAT;
+
   if (Object.keys(llm).length) out.llm = llm;
   if (Object.keys(asr).length) out.asr = asr;
   if (Object.keys(tts).length) out.tts = tts;
+  if (Object.keys(ytdlp).length) out.ytdlp = ytdlp;
 
   return out;
 }

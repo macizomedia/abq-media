@@ -1,0 +1,15 @@
+name: default
+description: Full pipeline with research
+version: 1
+stages:
+  - name: transcript
+    enabled: true
+  - name: research-prompt
+    enabled: true
+  - name: research
+    enabled: true
+    max_tokens: 6000
+  - name: script
+    enabled: true
+  - name: tts
+    enabled: true

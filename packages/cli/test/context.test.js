@@ -96,18 +96,16 @@ describe('validateContextForState — meta fields', () => {
 });
 
 describe('validateContextForState — state-specific', () => {
-  test('INPUT_YOUTUBE requires inputType and youtubeUrl', () => {
+  test('INPUT_YOUTUBE requires inputType (youtubeUrl is set BY the handler)', () => {
     assert.throws(
       () => validateContextForState(validCtx(), 'INPUT_YOUTUBE'),
       /inputType/,
     );
-    assert.throws(
-      () => validateContextForState(validCtx({ inputType: 'youtube' }), 'INPUT_YOUTUBE'),
-      /youtubeUrl/,
-    );
+    // youtubeUrl is an OUTPUT of INPUT_YOUTUBE — NOT a precondition.
+    // Providing just inputType should pass.
     assert.doesNotThrow(
       () => validateContextForState(
-        validCtx({ inputType: 'youtube', youtubeUrl: 'https://youtube.com/watch?v=x' }),
+        validCtx({ inputType: 'youtube' }),
         'INPUT_YOUTUBE',
       ),
     );
@@ -130,13 +128,13 @@ describe('validateContextForState — state-specific', () => {
     );
   });
 
-  test('SCRIPT_GENERATE requires outputType', () => {
+  test('SCRIPT_GENERATE requires projectName', () => {
     assert.throws(
-      () => validateContextForState(validCtx(), 'SCRIPT_GENERATE'),
-      /outputType/,
+      () => validateContextForState(validCtx({ projectName: '' }), 'SCRIPT_GENERATE'),
+      /projectName/,
     );
     assert.doesNotThrow(
-      () => validateContextForState(validCtx({ outputType: 'podcast' }), 'SCRIPT_GENERATE'),
+      () => validateContextForState(validCtx({ projectName: 'p' }), 'SCRIPT_GENERATE'),
     );
   });
 

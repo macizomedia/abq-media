@@ -1,0 +1,15 @@
+name: research-only
+description: Deep research without audio output
+version: 1
+stages:
+  - name: transcript
+    enabled: true
+  - name: research-prompt
+    enabled: true
+  - name: research
+    enabled: true
+    max_tokens: 10000
+  - name: script
+    enabled: false
+  - name: tts
+    enabled: false

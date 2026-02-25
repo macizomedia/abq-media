@@ -117,25 +117,15 @@ describe('Dynamic transitions — INPUT_SELECT', () => {
   });
 });
 
-describe('Dynamic transitions — PROCESSING_SELECT', () => {
-  test('prompt → RESEARCH_PROMPT_GEN', () => {
-    assert.equal(getNextState('PROCESSING_SELECT', ctx({ processingType: 'prompt' })), 'RESEARCH_PROMPT_GEN');
-  });
-
-  test('article → RESEARCH_PROMPT_GEN', () => {
-    assert.equal(getNextState('PROCESSING_SELECT', ctx({ processingType: 'article' })), 'RESEARCH_PROMPT_GEN');
-  });
-
-  test('podcast_script → SCRIPT_GENERATE', () => {
-    assert.equal(getNextState('PROCESSING_SELECT', ctx({ processingType: 'podcast_script' })), 'SCRIPT_GENERATE');
-  });
-
-  test('export → PACKAGE', () => {
-    assert.equal(getNextState('PROCESSING_SELECT', ctx({ processingType: 'export' })), 'PACKAGE');
-  });
-
-  test('translate → TRANSLATE', () => {
-    assert.equal(getNextState('PROCESSING_SELECT', ctx({ processingType: 'translate' })), 'TRANSLATE');
+describe('Static transitions — PROCESSING_SELECT', () => {
+  test('returns static array with all valid targets', () => {
+    const result = getNextState('PROCESSING_SELECT', ctx());
+    assert.ok(Array.isArray(result), 'Expected static array');
+    assert.ok(result.includes('RESEARCH_PROMPT_GEN'));
+    assert.ok(result.includes('SCRIPT_GENERATE'));
+    assert.ok(result.includes('TRANSLATE'));
+    assert.ok(result.includes('PACKAGE'));
+    assert.ok(result.includes('COMPLETE'));
   });
 });
 
@@ -150,49 +140,46 @@ describe('Dynamic transitions — RESEARCH_PROMPT_GEN', () => {
 });
 
 describe('Dynamic transitions — ARTICLE_REVIEW', () => {
-  test('retry (error + attempts < 3) → ARTICLE_GENERATE', () => {
+  test('retry (articleRetryRequested + attempts < 3) → ARTICLE_GENERATE', () => {
     assert.equal(
-      getNextState('ARTICLE_REVIEW', ctx({ lastError: new Error('bad'), articleAttempts: 1 })),
+      getNextState('ARTICLE_REVIEW', ctx({ articleRetryRequested: true, articleAttempts: 1 })),
       'ARTICLE_GENERATE',
     );
   });
 
-  test('approved (no error) → OUTPUT_SELECT', () => {
+  test('approved (no retry requested) → OUTPUT_SELECT', () => {
     assert.equal(
-      getNextState('ARTICLE_REVIEW', ctx({ lastError: undefined, articleAttempts: 1 })),
+      getNextState('ARTICLE_REVIEW', ctx({ articleRetryRequested: undefined, articleAttempts: 1 })),
       'OUTPUT_SELECT',
     );
   });
 
   test('exhausted retries → OUTPUT_SELECT', () => {
     assert.equal(
-      getNextState('ARTICLE_REVIEW', ctx({ lastError: new Error('bad'), articleAttempts: 3 })),
+      getNextState('ARTICLE_REVIEW', ctx({ articleRetryRequested: true, articleAttempts: 3 })),
       'OUTPUT_SELECT',
     );
   });
 });
 
-describe('Dynamic transitions — OUTPUT_SELECT', () => {
-  test('podcast → SCRIPT_GENERATE', () => {
-    assert.equal(getNextState('OUTPUT_SELECT', ctx({ outputType: 'podcast' })), 'SCRIPT_GENERATE');
-  });
-
-  test('article → ARTICLE_GENERATE', () => {
-    assert.equal(getNextState('OUTPUT_SELECT', ctx({ outputType: 'article' })), 'ARTICLE_GENERATE');
-  });
-
-  test('export_zip → PACKAGE', () => {
-    assert.equal(getNextState('OUTPUT_SELECT', ctx({ outputType: 'export_zip' })), 'PACKAGE');
+describe('Static transitions — OUTPUT_SELECT', () => {
+  test('returns static array with all valid targets', () => {
+    const result = getNextState('OUTPUT_SELECT', ctx());
+    assert.ok(Array.isArray(result), 'Expected static array');
+    assert.ok(result.includes('SCRIPT_GENERATE'));
+    assert.ok(result.includes('ARTICLE_GENERATE'));
+    assert.ok(result.includes('PACKAGE'));
+    assert.ok(result.includes('COMPLETE'));
   });
 });
 
-describe('Dynamic transitions — SCRIPT_GENERATE', () => {
-  test('podcast → TTS_RENDER', () => {
-    assert.equal(getNextState('SCRIPT_GENERATE', ctx({ outputType: 'podcast' })), 'TTS_RENDER');
-  });
-
-  test('reel → PACKAGE', () => {
-    assert.equal(getNextState('SCRIPT_GENERATE', ctx({ outputType: 'reel_script' })), 'PACKAGE');
+describe('Static transitions — SCRIPT_GENERATE', () => {
+  test('returns static array with all valid targets', () => {
+    const result = getNextState('SCRIPT_GENERATE', ctx());
+    assert.ok(Array.isArray(result), 'Expected static array');
+    assert.ok(result.includes('TTS_RENDER'));
+    assert.ok(result.includes('PACKAGE'));
+    assert.ok(result.includes('OUTPUT_SELECT'));
   });
 });
 

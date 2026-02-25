@@ -99,6 +99,7 @@ export function createInitialContext(opts: CreateContextOptions): CLIContext {
 
     // Article review loop
     articleAttempts: undefined,
+    articleRetryRequested: undefined,
 
     // Legacy compat
     legacyState: undefined,
@@ -123,9 +124,10 @@ const STATE_PRECONDITIONS: Partial<Record<State, (keyof CLIContext)[]>> = {
   INPUT_SELECT: ['projectName', 'runDir'],
 
   // Before entering an input handler, inputType must be set.
-  INPUT_YOUTUBE: ['inputType', 'youtubeUrl'],
-  INPUT_AUDIO: ['inputType', 'inputPath'],
-  INPUT_TEXT: ['inputType', 'inputPath'],
+  // NOTE: youtubeUrl / inputPath are OUTPUTS of these handlers — do NOT require them here.
+  INPUT_YOUTUBE: ['inputType'],
+  INPUT_AUDIO: ['inputType'],
+  INPUT_TEXT: ['inputType'],
 
   // Transcription needs an input path or YouTube URL.
   TRANSCRIPTION: ['inputType'],
@@ -154,8 +156,8 @@ const STATE_PRECONDITIONS: Partial<Record<State, (keyof CLIContext)[]>> = {
   // Output selection — user must have done some processing first.
   OUTPUT_SELECT: ['projectName'],
 
-  // Script generation (podcast or reel).
-  SCRIPT_GENERATE: ['outputType'],
+  // Script generation (podcast or reel) — outputType OR processingType suffices.
+  SCRIPT_GENERATE: ['projectName'],
 
   // TTS needs a podcast script.
   TTS_RENDER: ['podcastScriptPath'],

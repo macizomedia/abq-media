@@ -17,8 +17,8 @@ import type { ASRConfig } from '../config.js';
 export interface ASRRequest {
   /** Absolute path to audio file (WAV, MP3, etc.). */
   audioPath: string;
-  /** BCP-47 language code. */
-  lang: string;
+  /** Optional language hint (ISO-639-1 recommended). */
+  lang?: string;
 }
 
 export interface ASRResponse {
@@ -145,7 +145,9 @@ export class OpenAIWhisperProvider implements ASRProvider {
     const form = new FormData();
     form.append('file', blob, basename(req.audioPath));
     form.append('model', this.model);
-    form.append('language', req.lang);
+    if (req.lang?.trim()) {
+      form.append('language', req.lang.trim());
+    }
     form.append('response_format', 'text');
 
     const res = await fetch(url, {

@@ -10,6 +10,8 @@
  * @see {@link ../../.github/instructions/REFACTOR_PLAN.md} for architecture rationale
  */
 
+import type { YouTubeUrl } from '../utils/youtube-url.js';
+
 // ---------------------------------------------------------------------------
 // State — every possible position in the CLI flow
 // ---------------------------------------------------------------------------
@@ -212,8 +214,8 @@ export interface CLIContext {
   /** The state the pipeline is currently in (or about to enter). */
   currentState: State;
 
-  /** Ordered list of states visited so far. */
-  stateHistory: State[];
+  /** Ordered list of states visited so far. Readonly to prevent accidental .push(). */
+  stateHistory: readonly State[];
 
   /** BCP-47 language code (default: `'es'`). */
   lang: string;
@@ -226,8 +228,8 @@ export interface CLIContext {
   /** Absolute path to a local file input (audio or text). */
   inputPath?: string;
 
-  /** YouTube URL when `inputType === 'youtube'`. */
-  youtubeUrl?: string;
+  /** YouTube URL when `inputType === 'youtube'`. Value Object — always pre-validated. */
+  youtubeUrl?: YouTubeUrl;
 
   /** Raw text content when `inputType === 'raw'`. */
   rawText?: string;
@@ -309,6 +311,9 @@ export interface CLIContext {
   /** How many article generation attempts have been made (max 3). */
   articleAttempts?: number;
 
+  /** Set to true when the user requests an article revision (not an error). */
+  articleRetryRequested?: boolean;
+
   // ── Legacy compat ─────────────────────────────────────────────────────
 
   /** Legacy flat state.json — maintained for backward compat with existing runs. */
@@ -342,7 +347,7 @@ export interface StageResult {
  * Handlers must NOT call other handlers directly — the runner manages sequencing.
  * Handlers must NOT throw — they return `nextState: 'ERROR'` with `lastError` set.
  */
-export type StageHandler = (ctx: CLIContext) => Promise<StageResult>;
+export type StageHandler = (ctx: Readonly<CLIContext>) => Promise<StageResult>;
 
 // ---------------------------------------------------------------------------
 // Stage registry type
@@ -365,7 +370,7 @@ export type StageRegistry = {
  * - A static array of valid next states (for states with fixed successors)
  * - A function that picks the next state based on context (for dynamic branching)
  */
-export type TransitionRule = State[] | ((ctx: CLIContext) => State);
+export type TransitionRule = State[] | ((ctx: Readonly<CLIContext>) => State);
 
 /**
  * The complete transition map for the CLI state machine.

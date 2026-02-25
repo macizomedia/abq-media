@@ -61,6 +61,9 @@ export async function cmdInit(): Promise<void> {
   let tone = arg('--tone', 'informative');
   let editorCommand = arg('--editor');
   let elevenLabsApiKey = arg('--elevenlabs-key');
+  let ytdlpCookies = arg('--ytdlp-cookies');
+  let ytdlpCookiesFromBrowser = arg('--ytdlp-cookies-from-browser');
+  let ytdlpJsRuntimes = arg('--ytdlp-js-runtimes');
 
   if (!nonInteractive && process.stdin.isTTY) {
     if (!projectName) projectName = await ask(`Project name [${path.basename(process.cwd())}]: `, path.basename(process.cwd()));
@@ -76,6 +79,9 @@ export async function cmdInit(): Promise<void> {
     if (!cta) cta = await ask('CTA (one sentence): ', '');
     if (!tone) tone = await ask('Tone preset [informative]: ', 'informative');
     if (!editorCommand) editorCommand = await ask('Preferred editor command (e.g. "code --wait") [auto]: ', '');
+    if (!ytdlpCookies) ytdlpCookies = await ask('yt-dlp cookies file (optional): ', '');
+    if (!ytdlpCookiesFromBrowser) ytdlpCookiesFromBrowser = await ask('yt-dlp cookies from browser (optional, e.g. "chrome"): ', '');
+    if (!ytdlpJsRuntimes) ytdlpJsRuntimes = await ask('yt-dlp js runtimes (optional, e.g. "bun:/path/to/bun"): ', '');
   } else {
     if (!llmProvider && !nonInteractive) llmProvider = 'openai';
   }
@@ -116,6 +122,9 @@ export async function cmdInit(): Promise<void> {
     asrModel: asrModel || existingCreds.asrModel || 'whisper-1',
     elevenLabsApiKey: elevenLabsApiKey || existingCreds.elevenLabsApiKey || '',
     editorCommand: detectedEditor,
+    ytdlpCookies: ytdlpCookies || existingCreds.ytdlpCookies || '',
+    ytdlpCookiesFromBrowser: ytdlpCookiesFromBrowser || existingCreds.ytdlpCookiesFromBrowser || '',
+    ytdlpJsRuntimes: ytdlpJsRuntimes || existingCreds.ytdlpJsRuntimes || '',
     lang,
     timezone,
     updatedAt: new Date().toISOString(),

@@ -77,6 +77,7 @@ export {
   isValidAudioFile,
   isValidTextFile,
   isOpenRouterKey,
+  YouTubeUrl,
 } from './utils/validation.js';
 
 export {
@@ -106,16 +107,6 @@ export {
   unwrapCancel,
   clack,
 } from './ui/prompts.js';
-
-// Phase 4 pre-step: Core bridge
-export {
-  runCorePipeline,
-  runPrep,
-  runPublish,
-  type CoreRunResult,
-  type PrepInput,
-  type PublishInput,
-} from './utils/core-bridge.js';
 
 // Phase 5: Machine runner
 export {

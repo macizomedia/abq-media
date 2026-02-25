@@ -25,9 +25,13 @@ import {
 
   // Pipeline
   Pipeline,
+  FallbackStage,
 
   // Stages
   youtubeIngestStage,
+  captionsStage,
+  ytdlpSubsStage,
+  ytAsrStage,
   textFileIngestStage,
   audioFileIngestStage,
   digestStage,
@@ -150,6 +154,14 @@ async function cmdPrep() {
     ingestStage = audioFileIngestStage;
   } else if (transcriptFile) {
     ingestStage = textFileIngestStage; // transcript files are plain text
+  } else if (useCaptionsOnly) {
+    ingestStage = new FallbackStage({
+      name: 'ingest:youtube-captions-only',
+      description: 'YouTube captions + yt-dlp subtitles only',
+      alternatives: [captionsStage, ytdlpSubsStage],
+    });
+  } else if (useAsrOnly) {
+    ingestStage = ytAsrStage;
   } else {
     ingestStage = youtubeIngestStage; // FallbackStage with caption→ytdlp→asr chain
   }

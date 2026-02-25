@@ -2,12 +2,18 @@
  * @module utils/validation
  * Input validation helpers for URLs, audio files, and text files.
  *
- * YouTube ID extraction is adapted from the monolith's `getYouTubeId()`.
- * Audio/text validators check extension AND existence on disk.
+ * YouTube validation is now delegated to the {@link YouTubeUrl} value object.
+ * The `getYouTubeId()` and `isValidYouTubeUrl()` functions are kept for
+ * backward compatibility but delegate to `YouTubeUrl.parse()` internally.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+
+import { YouTubeUrl } from './youtube-url.js';
+
+// Re-export the value object for convenience
+export { YouTubeUrl } from './youtube-url.js';
 
 // ---------------------------------------------------------------------------
 // YouTube URL validation
@@ -24,29 +30,19 @@ const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.vtt', '.srt']);
  * Supports `youtu.be/<id>` and `youtube.com/watch?v=<id>`.
  * Returns `null` for invalid URLs.
  *
- * Extracted from the monolith's `getYouTubeId()`.
+ * @deprecated Prefer `YouTubeUrl.parse(raw)?.videoId` for new code.
  */
 export function getYouTubeId(raw: string): string | null {
-  if (!raw) return null;
-  try {
-    const url = new URL(raw);
-    if (url.hostname.includes('youtu.be')) {
-      return url.pathname.replace('/', '').trim() || null;
-    }
-    if (url.hostname.includes('youtube.com')) {
-      return url.searchParams.get('v');
-    }
-  } catch {
-    // Not a valid URL
-  }
-  return null;
+  return YouTubeUrl.parse(raw)?.videoId ?? null;
 }
 
 /**
  * Check whether a string is a valid YouTube URL (has an extractable video ID).
+ *
+ * @deprecated Prefer `YouTubeUrl.parse(url) !== null` for new code.
  */
 export function isValidYouTubeUrl(url: string): boolean {
-  return getYouTubeId(url) !== null;
+  return YouTubeUrl.parse(url) !== null;
 }
 
 // ---------------------------------------------------------------------------

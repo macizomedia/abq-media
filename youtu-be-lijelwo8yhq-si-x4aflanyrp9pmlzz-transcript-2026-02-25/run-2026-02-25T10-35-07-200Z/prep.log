@@ -1,0 +1,232 @@
+2026-02-25T10:35:07.225Z [start] ingest:youtube
+2026-02-25T10:35:07.225Z [progress] ingest:youtube: Trying transcribe:captions…
+2026-02-25T10:35:07.227Z [progress] transcribe:captions: Trying endpoint: lang=es-ES
+2026-02-25T10:35:08.049Z [progress] transcribe:captions: Trying endpoint: lang=es-ES
+2026-02-25T10:35:08.416Z [progress] transcribe:captions: Trying endpoint: lang=es-ES
+2026-02-25T10:35:08.896Z [progress] transcribe:captions: Trying endpoint: lang=es-ES
+2026-02-25T10:35:09.334Z [progress] transcribe:captions: Trying endpoint: lang=es
+2026-02-25T10:35:09.623Z [progress] transcribe:captions: Trying endpoint: lang=es
+2026-02-25T10:35:09.922Z [progress] transcribe:captions: Trying endpoint: lang=es
+2026-02-25T10:35:10.185Z [progress] transcribe:captions: Trying endpoint: lang=es
+2026-02-25T10:35:10.579Z [progress] transcribe:captions: Trying endpoint: lang=en
+2026-02-25T10:35:11.024Z [progress] transcribe:captions: Trying endpoint: lang=en
+2026-02-25T10:35:11.497Z [progress] transcribe:captions: Trying endpoint: lang=en
+2026-02-25T10:35:11.728Z [progress] transcribe:captions: Trying endpoint: lang=en
+2026-02-25T10:35:12.109Z [progress] transcribe:captions: Trying endpoint: lang=en-US
+2026-02-25T10:35:12.564Z [progress] transcribe:captions: Trying endpoint: lang=en-US
+2026-02-25T10:35:12.900Z [progress] transcribe:captions: Trying endpoint: lang=en-US
+2026-02-25T10:35:13.208Z [progress] transcribe:captions: Trying endpoint: lang=en-US
+2026-02-25T10:35:13.633Z [error] transcribe:captions: No captions found for any language candidate
+2026-02-25T10:35:13.647Z [progress] ingest:youtube: Trying transcribe:ytdlp…
+2026-02-25T10:35:13.656Z [start] ytdlp:probe
+2026-02-25T10:35:13.657Z [progress] ytdlp:probe: Probing: yt-dlp --verbose --simulate --dump-json --no-warnings 'https://youtu.be/lIJelwO8yHQ\?si\=X4afLANYrP9pmlZZ'
+2026-02-25T10:35:14.182Z [progress] ytdlp:probe: [probe stderr] [debug] Command-line config: ['--verbose', '--simulate', '--dump-json', '--no-warnings', 'https://youtu.be/lIJelwO8yHQ\\?si\\=X4afLANYrP9pmlZZ']
+2026-02-25T10:35:14.202Z [progress] ytdlp:probe: [probe stderr] [debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)
+2026-02-25T10:35:14.202Z [progress] ytdlp:probe: [probe stderr] [debug] yt-dlp version stable@2026.02.21 from yt-dlp/yt-dlp [646bb31f3] (pip)
+2026-02-25T10:35:14.380Z [progress] ytdlp:probe: [probe stderr] [debug] Python 3.12.12 (CPython x86_64 64bit) - macOS-12.7.6-x86_64-i386-64bit (OpenSSL 3.5.5 27 Jan 2026)
+2026-02-25T10:35:14.706Z [progress] ytdlp:probe: [probe stderr] [debug] exe versions: ffmpeg 8.0.1 (setts), ffprobe 8.0.1
+2026-02-25T10:35:14.706Z [progress] ytdlp:probe: [probe stderr] [debug] Optional libraries: sqlite3-3.50.4
+2026-02-25T10:35:14.744Z [progress] ytdlp:probe: [probe stderr] [debug] JS runtimes: none
+2026-02-25T10:35:14.752Z [progress] ytdlp:probe: [probe stderr] [debug] Proxy map: {}
+2026-02-25T10:35:14.753Z [progress] ytdlp:probe: [probe stderr] [debug] Request Handlers: urllib
+2026-02-25T10:35:14.755Z [progress] ytdlp:probe: [probe stderr] [debug] Plugin directories: none
+2026-02-25T10:35:14.883Z [progress] ytdlp:probe: [probe stderr] [debug] Loaded 1864 extractors
+2026-02-25T10:35:15.006Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] [pot] PO Token Providers: none
+2026-02-25T10:35:15.007Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] [pot] PO Token Cache Providers: memory
+2026-02-25T10:35:15.008Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] [pot] PO Token Cache Spec Providers: webpo
+2026-02-25T10:35:15.009Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] [jsc] JS Challenge Providers: bun (unavailable), deno (unavailable), node (unavailable), quickjs (unavailable)
+2026-02-25T10:35:15.010Z [progress] ytdlp:probe: [probe stderr] [youtube] Extracting URL: https://youtu.be/lIJelwO8yHQ\?si\=X4afLANYrP9pmlZZ
+2026-02-25T10:35:15.010Z [progress] ytdlp:probe: [probe stderr] [youtube] lIJelwO8yHQ: Downloading webpage
+2026-02-25T10:35:15.794Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] Forcing "tv" player JS variant for player 251ca12e
+2026-02-25T10:35:15.794Z [progress] ytdlp:probe: [probe stderr]         original url = /s/player/251ca12e/player_es6.vflset/en_US/base.js
+2026-02-25T10:35:15.800Z [progress] ytdlp:probe: [probe stderr] [youtube] lIJelwO8yHQ: Downloading android vr player API JSON
+2026-02-25T10:35:16.240Z [progress] ytdlp:probe: [probe stderr] [debug] Sort order given by extractor: quality, res, fps, hdr:12, source, vcodec, channels, acodec, lang, proto
+2026-02-25T10:35:16.240Z [progress] ytdlp:probe: [probe stderr] [debug] Formats sorted by: hasvid, ie_pref, quality, res, fps, hdr:12(7), source, vcodec, channels, acodec, lang, proto, size, br, asr, vext, aext, hasaud, id
+2026-02-25T10:35:16.758Z [progress] ytdlp:probe: [probe stderr] [debug] Default format spec: bestvideo*+bestaudio/best
+2026-02-25T10:35:16.762Z [progress] ytdlp:probe: [probe stderr] [info] lIJelwO8yHQ: Downloading 1 format(s): 399+251
+2026-02-25T10:35:17.012Z [progress] ytdlp:probe: Probed: "How Fast Will A.I. Agents Rip Through the Economy? | The Ezra Klein Show" (5880s) — 27 formats, 7 manual subs, 1099 auto captions
+2026-02-25T10:35:17.013Z [complete] ytdlp:probe (3356ms)
+2026-02-25T10:35:17.023Z [start] ytdlp:subtitles
+2026-02-25T10:35:17.024Z [progress] ytdlp:subtitles: Running: yt-dlp --verbose --skip-download --write-auto-sub --write-sub --sub-format vtt --sub-langs es-ES,es,en,en-US -o 'video.%(ext)s' 'https://youtu.be/lIJelwO8yHQ\?si\=X4afLANYrP9pmlZZ'
+2026-02-25T10:35:17.386Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Command-line config: ['--verbose', '--skip-download', '--write-auto-sub', '--write-sub', '--sub-format', 'vtt', '--sub-langs', 'es-ES,es,en,en-US', '-o', 'video.%(ext)s', 'https://youtu.be/lIJelwO8yHQ\\?si\\=X4afLANYrP9pmlZZ']
+2026-02-25T10:35:17.392Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)
+2026-02-25T10:35:17.393Z [progress] ytdlp:subtitles: [yt-dlp] [debug] yt-dlp version stable@2026.02.21 from yt-dlp/yt-dlp [646bb31f3] (pip)
+2026-02-25T10:35:17.506Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Python 3.12.12 (CPython x86_64 64bit) - macOS-12.7.6-x86_64-i386-64bit (OpenSSL 3.5.5 27 Jan 2026)
+2026-02-25T10:35:17.757Z [progress] ytdlp:subtitles: [yt-dlp] [debug] exe versions: ffmpeg 8.0.1 (setts), ffprobe 8.0.1
+2026-02-25T10:35:17.757Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Optional libraries: sqlite3-3.50.4
+2026-02-25T10:35:17.803Z [progress] ytdlp:subtitles: [yt-dlp] [debug] JS runtimes: none
+2026-02-25T10:35:17.824Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Proxy map: {}
+2026-02-25T10:35:17.825Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Request Handlers: urllib
+2026-02-25T10:35:17.828Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Plugin directories: none
+2026-02-25T10:35:17.987Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Loaded 1864 extractors
+2026-02-25T10:35:18.164Z [progress] ytdlp:subtitles: [yt-dlp] [debug] [youtube] [pot] PO Token Providers: none
+2026-02-25T10:35:18.164Z [progress] ytdlp:subtitles: [yt-dlp] [debug] [youtube] [pot] PO Token Cache Providers: memory
+2026-02-25T10:35:18.164Z [progress] ytdlp:subtitles: [yt-dlp] [debug] [youtube] [pot] PO Token Cache Spec Providers: webpo
+2026-02-25T10:35:18.166Z [progress] ytdlp:subtitles: [yt-dlp] [debug] [youtube] [jsc] JS Challenge Providers: bun (unavailable), deno (unavailable), node (unavailable), quickjs (unavailable)
+2026-02-25T10:35:19.183Z [progress] ytdlp:subtitles: [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-02-25T10:35:19.190Z [progress] ytdlp:subtitles: [yt-dlp] [debug] [youtube] Forcing "tv" player JS variant for player 251ca12e
+2026-02-25T10:35:19.190Z [progress] ytdlp:subtitles: [yt-dlp]         original url = /s/player/251ca12e/player_es6_tce.vflset/en_US/base.js
+2026-02-25T10:35:19.735Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Sort order given by extractor: quality, res, fps, hdr:12, source, vcodec, channels, acodec, lang, proto
+2026-02-25T10:35:19.735Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Formats sorted by: hasvid, ie_pref, quality, res, fps, hdr:12(7), source, vcodec, channels, acodec, lang, proto, size, br, asr, vext, aext, hasaud, id
+2026-02-25T10:35:20.001Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Default format spec: bestvideo*+bestaudio/best
+2026-02-25T10:35:20.127Z [progress] ytdlp:subtitles: [yt-dlp] [debug] Invoking http downloader on "https://www.youtube.com/api/timedtext?v=lIJelwO8yHQ&ei=Z9CeaYn2FrGUvdIPsrqBmAI&caps=asr&opi=112496729&xoaf=5&xowf=1&xospf=1&hl=en&ip=0.0.0.0&ipbits=0&expire=1772040919&sparams=ip%2Cipbits%2Cexpire%2Cv%2Cei%2Ccaps%2Copi%2Cxoaf&signature=AA65CF26302D5D1A17D5D3D5AEDB98DE7738D0FF.786FE0C408D1E6F99205C8A5DA3FED161ECD4991&key=yt8&kind=asr&lang=en&fmt=vtt&tlang=es"
+2026-02-25T10:35:20.130Z [progress] ytdlp:subtitles: [yt-dlp] WARNING: The extractor specified to use impersonation for this download, but no impersonate target is available. If you encounter errors, then see  https://github.com/yt-dlp/yt-dlp#impersonation  for information on installing the required dependencies
+2026-02-25T10:35:20.722Z [progress] ytdlp:subtitles: [yt-dlp] ERROR: Unable to download video subtitles for 'es': HTTP Error 429: Too Many Requests
+2026-02-25T10:35:20.723Z [progress] ytdlp:subtitles: [yt-dlp] Traceback (most recent call last):
+2026-02-25T10:35:20.723Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/networking/_urllib.py", line 419, in _send
+2026-02-25T10:35:20.725Z [progress] ytdlp:subtitles: [yt-dlp]     res = opener.open(urllib_req, timeout=self._calculate_timeout(request))
+2026-02-25T10:35:20.725Z [progress] ytdlp:subtitles: [yt-dlp]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.726Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/urllib/request.py", line 521, in open
+2026-02-25T10:35:20.726Z [progress] ytdlp:subtitles: [yt-dlp]     response = meth(req, response)
+2026-02-25T10:35:20.726Z [progress] ytdlp:subtitles: [yt-dlp]                ^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.727Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/urllib/request.py", line 630, in http_response
+2026-02-25T10:35:20.727Z [progress] ytdlp:subtitles: [yt-dlp]     response = self.parent.error(
+2026-02-25T10:35:20.727Z [progress] ytdlp:subtitles: [yt-dlp]                ^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.727Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/urllib/request.py", line 559, in error
+2026-02-25T10:35:20.728Z [progress] ytdlp:subtitles: [yt-dlp]     return self._call_chain(*args)
+2026-02-25T10:35:20.728Z [progress] ytdlp:subtitles: [yt-dlp]            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.729Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/urllib/request.py", line 492, in _call_chain
+2026-02-25T10:35:20.729Z [progress] ytdlp:subtitles: [yt-dlp]     result = func(*args)
+2026-02-25T10:35:20.735Z [progress] ytdlp:subtitles: [yt-dlp]              ^^^^^^^^^^^
+2026-02-25T10:35:20.735Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/urllib/request.py", line 639, in http_error_default
+2026-02-25T10:35:20.735Z [progress] ytdlp:subtitles: [yt-dlp]     raise HTTPError(req.full_url, code, msg, hdrs, fp)
+2026-02-25T10:35:20.735Z [progress] ytdlp:subtitles: [yt-dlp] urllib.error.HTTPError: HTTP Error 429: Too Many Requests
+2026-02-25T10:35:20.736Z [progress] ytdlp:subtitles: [yt-dlp] The above exception was the direct cause of the following exception:
+2026-02-25T10:35:20.736Z [progress] ytdlp:subtitles: [yt-dlp] Traceback (most recent call last):
+2026-02-25T10:35:20.736Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 4449, in _write_subtitles
+2026-02-25T10:35:20.736Z [progress] ytdlp:subtitles: [yt-dlp]     self.dl(sub_filename, sub_copy, subtitle=True)
+2026-02-25T10:35:20.736Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 3285, in dl
+2026-02-25T10:35:20.736Z [progress] ytdlp:subtitles: [yt-dlp]     return fd.download(name, new_info, subtitle)
+2026-02-25T10:35:20.736Z [progress] ytdlp:subtitles: [yt-dlp]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.736Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/downloader/common.py", line 480, in download
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]     ret = self.real_download(filename, info_dict)
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/downloader/http.py", line 362, in real_download
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]     establish_connection()
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/downloader/http.py", line 119, in establish_connection
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]     ctx.data = self.ydl.urlopen(request)
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]                ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 4260, in urlopen
+2026-02-25T10:35:20.737Z [progress] ytdlp:subtitles: [yt-dlp]     return self._request_director.send(req)
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/networking/common.py", line 117, in send
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]     response = handler.send(request)
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]                ^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/networking/_helper.py", line 194, in wrapper
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]     return func(self, *args, **kwargs)
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/networking/common.py", line 359, in send
+2026-02-25T10:35:20.738Z [progress] ytdlp:subtitles: [yt-dlp]     return self._send(request)
+2026-02-25T10:35:20.739Z [progress] ytdlp:subtitles: [yt-dlp]            ^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.739Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/networking/_urllib.py", line 424, in _send
+2026-02-25T10:35:20.739Z [progress] ytdlp:subtitles: [yt-dlp]     raise HTTPError(UrllibResponseAdapter(e.fp), redirect_loop='redirect error' in str(e)) from e
+2026-02-25T10:35:20.739Z [progress] ytdlp:subtitles: [yt-dlp] yt_dlp.networking.exceptions.HTTPError: HTTP Error 429: Too Many Requests
+2026-02-25T10:35:20.739Z [progress] ytdlp:subtitles: [yt-dlp] During handling of the above exception, another exception occurred:
+2026-02-25T10:35:20.739Z [progress] ytdlp:subtitles: [yt-dlp] Traceback (most recent call last):
+2026-02-25T10:35:20.739Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 1698, in wrapper
+2026-02-25T10:35:20.739Z [progress] ytdlp:subtitles: [yt-dlp]     return func(self, *args, **kwargs)
+2026-02-25T10:35:20.740Z [progress] ytdlp:subtitles: [yt-dlp]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.743Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 1854, in __extract_info
+2026-02-25T10:35:20.744Z [progress] ytdlp:subtitles: [yt-dlp]     return self.process_ie_result(ie_result, download, extra_info)
+2026-02-25T10:35:20.744Z [progress] ytdlp:subtitles: [yt-dlp]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.744Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 1913, in process_ie_result
+2026-02-25T10:35:20.744Z [progress] ytdlp:subtitles: [yt-dlp]     ie_result = self.process_video_result(ie_result, download=download)
+2026-02-25T10:35:20.745Z [progress] ytdlp:subtitles: [yt-dlp]                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.745Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 3096, in process_video_result
+2026-02-25T10:35:20.746Z [progress] ytdlp:subtitles: [yt-dlp]     self.process_info(new_info)
+2026-02-25T10:35:20.746Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 189, in wrapper
+2026-02-25T10:35:20.752Z [progress] ytdlp:subtitles: [yt-dlp]     return func(self, *args, **kwargs)
+2026-02-25T10:35:20.752Z [progress] ytdlp:subtitles: [yt-dlp]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.752Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 3353, in process_info
+2026-02-25T10:35:20.752Z [progress] ytdlp:subtitles: [yt-dlp]     sub_files = self._write_subtitles(info_dict, temp_filename)
+2026-02-25T10:35:20.753Z [progress] ytdlp:subtitles: [yt-dlp]                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-25T10:35:20.753Z [progress] ytdlp:subtitles: [yt-dlp]   File "/Users/user/.local/share/mise/installs/python/3.12.12/lib/python3.12/site-packages/yt_dlp/YoutubeDL.py", line 4457, in _write_subtitles
+2026-02-25T10:35:20.753Z [progress] ytdlp:subtitles: [yt-dlp]     raise DownloadError(msg)
+2026-02-25T10:35:20.753Z [progress] ytdlp:subtitles: [yt-dlp] yt_dlp.utils.DownloadError: Unable to download video subtitles for 'es': HTTP Error 429: Too Many Requests
+2026-02-25T10:35:20.831Z [progress] ytdlp:subtitles: yt-dlp exited 1
+2026-02-25T10:35:20.831Z [error] ytdlp:subtitles: yt-dlp subtitle download failed (exit 1).
+stderr: [debug] Command-line config: ['--verbose', '--skip-download', '--write-auto-sub', '--write-sub', '--sub-format', 'vtt', '--sub-langs', 'es-ES,es,en,en-US', '-o', 'video.%(ext)s', 'https://youtu.be/lIJelwO8yHQ\\?si\\=X4afLANYrP9pmlZZ']
+[debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)
+[debug] yt-dlp version stable@2026.02.21 from yt-dlp/yt-dlp [646bb31f3] (pip)
+[debug] Python 3.12.12 (CPython x86_64 64bit) - macOS-12.7.6-x86_64-i386-64bit (OpenSSL 3.5.5 27 Jan 2026)
+[debug] exe versions: ffmpeg 8.0.1 (setts), ffprobe 8.0.1
+[debug] Optional libraries: sqlite3-3.50.4
+[debug] JS runtimes: none
+[debug] Proxy map: {}
+[debug] Request Handlers: urllib
+[debug] Plugin directories: none
+[debug] Loaded 1864 extractors
+[debug] [youtube] [pot] PO Token Providers: none
+[debug] [youtube] [pot] PO Token Cache Providers: memory
+[debug] [youtube] [pot] PO Token Cache Spec Providers: webpo
+[debug] [youtube] [jsc] JS Challenge Provider
+2026-02-25T10:35:20.835Z [error] transcribe:ytdlp: yt-dlp subtitle download failed (exit 1).
+stderr: [debug] Command-line config: ['--verbose', '--skip-download', '--write-auto-sub', '--write-sub', '--sub-format', 'vtt', '--sub-langs', 'es-ES,es,en,en-US', '-o', 'video.%(ext)s', 'https://youtu.be/lIJelwO8yHQ\\?si\\=X4afLANYrP9pmlZZ']
+[debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)
+[debug] yt-dlp version stable@2026.02.21 from yt-dlp/yt-dlp [646bb31f3] (pip)
+[debug] Python 3.12.12 (CPython x86_64 64bit) - macOS-12.7.6-x86_64-i386-64bit (OpenSSL 3.5.5 27 Jan 2026)
+[debug] exe versions: ffmpeg 8.0.1 (setts), ffprobe 8.0.1
+[debug] Optional libraries: sqlite3-3.50.4
+[debug] JS runtimes: none
+[debug] Proxy map: {}
+[debug] Request Handlers: urllib
+[debug] Plugin directories: none
+[debug] Loaded 1864 extractors
+[debug] [youtube] [pot] PO Token Providers: none
+[debug] [youtube] [pot] PO Token Cache Providers: memory
+[debug] [youtube] [pot] PO Token Cache Spec Providers: webpo
+[debug] [youtube] [jsc] JS Challenge Provider
+2026-02-25T10:35:20.846Z [progress] ingest:youtube: Trying transcribe:yt-asr…
+2026-02-25T10:35:20.855Z [start] ytdlp:probe
+2026-02-25T10:35:20.855Z [progress] ytdlp:probe: Probing: yt-dlp --verbose --simulate --dump-json --no-warnings 'https://youtu.be/lIJelwO8yHQ\?si\=X4afLANYrP9pmlZZ'
+2026-02-25T10:35:21.248Z [progress] ytdlp:probe: [probe stderr] [debug] Command-line config: ['--verbose', '--simulate', '--dump-json', '--no-warnings', 'https://youtu.be/lIJelwO8yHQ\\?si\\=X4afLANYrP9pmlZZ']
+2026-02-25T10:35:21.254Z [progress] ytdlp:probe: [probe stderr] [debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)
+2026-02-25T10:35:21.254Z [progress] ytdlp:probe: [probe stderr] [debug] yt-dlp version stable@2026.02.21 from yt-dlp/yt-dlp [646bb31f3] (pip)
+2026-02-25T10:35:21.408Z [progress] ytdlp:probe: [probe stderr] [debug] Python 3.12.12 (CPython x86_64 64bit) - macOS-12.7.6-x86_64-i386-64bit (OpenSSL 3.5.5 27 Jan 2026)
+2026-02-25T10:35:21.625Z [progress] ytdlp:probe: [probe stderr] [debug] exe versions: ffmpeg 8.0.1 (setts), ffprobe 8.0.1
+2026-02-25T10:35:21.625Z [progress] ytdlp:probe: [probe stderr] [debug] Optional libraries: sqlite3-3.50.4
+2026-02-25T10:35:21.657Z [progress] ytdlp:probe: [probe stderr] [debug] JS runtimes: none
+2026-02-25T10:35:21.664Z [progress] ytdlp:probe: [probe stderr] [debug] Proxy map: {}
+2026-02-25T10:35:21.665Z [progress] ytdlp:probe: [probe stderr] [debug] Request Handlers: urllib
+2026-02-25T10:35:21.667Z [progress] ytdlp:probe: [probe stderr] [debug] Plugin directories: none
+2026-02-25T10:35:21.808Z [progress] ytdlp:probe: [probe stderr] [debug] Loaded 1864 extractors
+2026-02-25T10:35:21.961Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] [pot] PO Token Providers: none
+2026-02-25T10:35:21.961Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] [pot] PO Token Cache Providers: memory
+2026-02-25T10:35:21.963Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] [pot] PO Token Cache Spec Providers: webpo
+2026-02-25T10:35:21.964Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] [jsc] JS Challenge Providers: bun (unavailable), deno (unavailable), node (unavailable), quickjs (unavailable)
+2026-02-25T10:35:21.964Z [progress] ytdlp:probe: [probe stderr] [youtube] Extracting URL: https://youtu.be/lIJelwO8yHQ\?si\=X4afLANYrP9pmlZZ
+2026-02-25T10:35:21.964Z [progress] ytdlp:probe: [probe stderr] [youtube] lIJelwO8yHQ: Downloading webpage
+2026-02-25T10:35:22.927Z [progress] ytdlp:probe: [probe stderr] [debug] [youtube] Forcing "tv" player JS variant for player 251ca12e
+2026-02-25T10:35:22.927Z [progress] ytdlp:probe: [probe stderr]         original url = /s/player/251ca12e/player_es6_tce.vflset/en_US/base.js
+2026-02-25T10:35:22.931Z [progress] ytdlp:probe: [probe stderr] [youtube] lIJelwO8yHQ: Downloading android vr player API JSON
+2026-02-25T10:35:23.666Z [progress] ytdlp:probe: [probe stderr] [debug] Sort order given by extractor: quality, res, fps, hdr:12, source, vcodec, channels, acodec, lang, proto
+2026-02-25T10:35:23.666Z [progress] ytdlp:probe: [probe stderr] [debug] Formats sorted by: hasvid, ie_pref, quality, res, fps, hdr:12(7), source, vcodec, channels, acodec, lang, proto, size, br, asr, vext, aext, hasaud, id
+2026-02-25T10:35:23.750Z [progress] ytdlp:probe: [probe stderr] [debug] Default format spec: bestvideo*+bestaudio/best
+2026-02-25T10:35:23.752Z [progress] ytdlp:probe: [probe stderr] [info] lIJelwO8yHQ: Downloading 1 format(s): 399+251
+2026-02-25T10:35:23.925Z [progress] ytdlp:probe: Probed: "How Fast Will A.I. Agents Rip Through the Economy? | The Ezra Klein Show" (5880s) — 27 formats, 7 manual subs, 1099 auto captions
+2026-02-25T10:35:23.925Z [complete] ytdlp:probe (3070ms)
+2026-02-25T10:35:23.935Z [start] ytdlp:audio
+2026-02-25T10:35:23.936Z [progress] ytdlp:audio: Running: yt-dlp --verbose -f bestaudio --extract-audio --audio-format mp3 --audio-quality 5 -o 'audio.%(ext)s' 'https://youtu.be/lIJelwO8yHQ\?si\=X4afLANYrP9pmlZZ'
+2026-02-25T10:35:24.283Z [progress] ytdlp:audio: [yt-dlp] [debug] Command-line config: ['--verbose', '-f', 'bestaudio', '--extract-audio', '--audio-format', 'mp3', '--audio-quality', '5', '-o', 'audio.%(ext)s', 'https://youtu.be/lIJelwO8yHQ\\?si\\=X4afLANYrP9pmlZZ']
+2026-02-25T10:35:24.289Z [progress] ytdlp:audio: [yt-dlp] [debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)
+2026-02-25T10:35:24.289Z [progress] ytdlp:audio: [yt-dlp] [debug] yt-dlp version stable@2026.02.21 from yt-dlp/yt-dlp [646bb31f3] (pip)
+2026-02-25T10:35:24.390Z [progress] ytdlp:audio: [yt-dlp] [debug] Python 3.12.12 (CPython x86_64 64bit) - macOS-12.7.6-x86_64-i386-64bit (OpenSSL 3.5.5 27 Jan 2026)
+2026-02-25T10:35:24.615Z [progress] ytdlp:audio: [yt-dlp] [debug] exe versions: ffmpeg 8.0.1 (setts), ffprobe 8.0.1
+2026-02-25T10:35:24.615Z [progress] ytdlp:audio: [yt-dlp] [debug] Optional libraries: sqlite3-3.50.4
+2026-02-25T10:35:24.634Z [progress] ytdlp:audio: [yt-dlp] [debug] JS runtimes: none
+2026-02-25T10:35:24.653Z [progress] ytdlp:audio: [yt-dlp] [debug] Proxy map: {}
+2026-02-25T10:35:24.654Z [progress] ytdlp:audio: [yt-dlp] [debug] Request Handlers: urllib
+2026-02-25T10:35:24.656Z [progress] ytdlp:audio: [yt-dlp] [debug] Plugin directories: none
+2026-02-25T10:35:24.789Z [progress] ytdlp:audio: [yt-dlp] [debug] Loaded 1864 extractors
+2026-02-25T10:35:24.899Z [progress] ytdlp:audio: [yt-dlp] [debug] [youtube] [pot] PO Token Providers: none
+2026-02-25T10:35:24.900Z [progress] ytdlp:audio: [yt-dlp] [debug] [youtube] [pot] PO Token Cache Providers: memory
+2026-02-25T10:35:24.901Z [progress] ytdlp:audio: [yt-dlp] [debug] [youtube] [pot] PO Token Cache Spec Providers: webpo
+2026-02-25T10:35:24.902Z [progress] ytdlp:audio: [yt-dlp] [debug] [youtube] [jsc] JS Challenge Providers: bun (unavailable), deno (unavailable), node (unavailable), quickjs (unavailable)
+2026-02-25T10:35:26.317Z [progress] ytdlp:audio: [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-02-25T10:35:26.327Z [progress] ytdlp:audio: [yt-dlp] [debug] [youtube] Forcing "tv" player JS variant for player 251ca12e
+2026-02-25T10:35:26.327Z [progress] ytdlp:audio: [yt-dlp]         original url = /s/player/251ca12e/player_es6_tce.vflset/en_US/base.js
+2026-02-25T10:35:27.038Z [progress] ytdlp:audio: [yt-dlp] [debug] Sort order given by extractor: quality, res, fps, hdr:12, source, vcodec, channels, acodec, lang, proto
+2026-02-25T10:35:27.039Z [progress] ytdlp:audio: [yt-dlp] [debug] Formats sorted by: hasvid, ie_pref, quality, res, fps, hdr:12(7), source, vcodec, channels, acodec, lang, proto, size, br, asr, vext, aext, hasaud, id
+2026-02-25T10:35:27.171Z [progress] ytdlp:audio: [yt-dlp] [debug] Invoking http downloader on "https://rr4---sn-4g5lznez.googlevideo.com/videoplayback?expire=1772037326&ei=btCeaYv6I9Co8uMPoqvKyQw&ip=2a02%3A3102%3A5088%3A8500%3A85ca%3A941a%3A4efd%3Ae3f2&id=o-AIiUNgHRwJ-TzDbnauuzW8Ympoux1DLQW3V9BtJK4TTp&itag=251&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&cps=932&met=1772015726%2C&mh=ZF&mm=31%2C26&mn=sn-4g5lznez%2Csn-h0jelnez&ms=au%2Conr&mv=m&mvi=4&pl=49&rms=au%2Cau&initcwndbps=1786250&bui=AVNa5-yT--S1_jOrgHi-zFPbSQGKQENQvWPniMkL7MdBKQCNAzJ8vSr15_ltBSvMrCsTTCk99p5kXwAn&spc=6dlaFHgILAou&vprv=1&svpuc=1&mime=audio%2Fwebm&rqh=1&gir=yes&clen=90822344&dur=5880.161&lmt=1771931938740790&mt=1772015345&fvip=3&keepalive=yes&fexp=51552689%2C51565115%2C51565682%2C51580968&c=ANDROID_VR&txp=3308224&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&sig=AJEij0EwRQIhALGN_PrI6-spplqv3DnOt9k2NplCet_nO_gooNOQ_oKYAiAT6h9dwtfUURZzt906LxmtgNpE8PLaWmsdhRpc6fiIdQ%3D%3D&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRAIgcEp-nv30wZS3rG3FLkU882HuoY6NuQF9t3ZSOKNpSAACIGg_FnCeh0ELzhP5i1eF3020owbOjH2iFsn9yNihCNTQ"
+2026-02-25T10:35:31.137Z [progress] ytdlp:audio: [yt-dlp] [debug] ffmpeg command line: ffprobe -show_streams file:audio.webm
+2026-02-25T10:35:32.044Z [progress] ytdlp:audio: [yt-dlp] [debug] ffmpeg command line: ffmpeg -y -loglevel repeat+info -i file:audio.webm -vn -acodec libmp3lame -q:a 5.0 -movflags +faststart file:audio.mp3

@@ -20,16 +20,17 @@
   },
   "dependencies": {
     "@abquanta/abq-media-core": "^0.2.0",
-    "@clack/prompts": "^0.7.0"
+    "@clack/prompts": "^0.7.0",
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp src/cli.monolith.js dist/cli.monolith.js",
+    "build": "tsc -p tsconfig.json && cp src/cli.monolith.js dist/cli.monolith.js && mkdir -p dist/recipes dist/prompts && cp -R src/recipes/builtin dist/recipes/builtin && cp -R src/prompts/defaults dist/prompts/defaults",
     "init": "node ./dist/cli.js init",
-    "test": "node --test test/smoke.test.js",
+    "test": "npm run build && node --test test/smoke.test.js",
     "lint": "tsc --noEmit -p tsconfig.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"

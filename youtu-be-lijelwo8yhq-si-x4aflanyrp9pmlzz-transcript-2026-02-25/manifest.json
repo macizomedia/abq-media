@@ -1,0 +1,27 @@
+{
+  "id": "youtu-be-lijelwo8yhq-si-x4aflanyrp9pmlzz-transcript-2026-02-25",
+  "name": "youtu-be-lijelwo8yhq-si-x4aflanyrp9pmlzz-transcript-2026-02-25",
+  "createdAt": "2026-02-25T10:36:21.307Z",
+  "updatedAt": "2026-02-25T10:38:40.575Z",
+  "source": {
+    "type": "youtube",
+    "value": "https://youtu.be/lIJelwO8yHQ\\?si\\=X4afLANYrP9pmlZZ"
+  },
+  "recipe": "flash-podcast",
+  "targetFormat": "transcript",
+  "status": "failed",
+  "artifacts": [
+    {
+      "name": "metadata.json",
+      "stage": "artifact",
+      "size": 766072
+    },
+    {
+      "name": "prep.log",
+      "stage": "artifact",
+      "size": 40784
+    }
+  ],
+  "failedAt": "transform",
+  "failureReason": "Pipeline \"prep\" failed at stage \"ingest:youtube\": FallbackStage \"ingest:youtube\": all 3 alternatives failed:\n  transcribe:captions: No captions found for any language candidate\n  transcribe:ytdlp: yt-dlp subtitle download failed (exit 1).\nstderr: [debug] Command-line config: ['--verbose', '--skip-download', '--write-auto-sub', '--write-sub', '--sub-format', 'vtt', '--sub-langs', 'es-ES,es,en,en-US', '-o', 'video.%(ext)s', 'https://youtu.be/lIJelwO8yHQ\\\\?si\\\\=X4afLANYrP9pmlZZ']\n[debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)\n[debug] yt-dlp version stable@2026.02.21 from yt-dlp/yt-dlp [646bb31f3] (pip)\n[debug] Python 3.12.12 (CPython x86_64 64bit) - macOS-12.7.6-x86_64-i386-64bit (OpenSSL 3.5.5 27 Jan 2026)\n[debug] exe versions: ffmpeg 8.0.1 (setts), ffprobe 8.0.1\n[debug] Optional libraries: sqlite3-3.50.4\n[debug] JS runtimes: none\n[debug] Proxy map: {}\n[debug] Request Handlers: urllib\n[debug] Plugin directories: none\n[debug] Loaded 1864 extractors\n[debug] [youtube] [pot] PO Token Providers: none\n[debug] [youtube] [pot] PO Token Cache Providers: memory\n[debug] [youtube] [pot] PO Token Cache Spec Providers: webpo\n[debug] [youtube] [jsc] JS Challenge Provider\n  transcribe:yt-asr: yt-dlp audio download failed (exit 124).\nstderr: [debug] Command-line config: ['--verbose', '-f', 'bestaudio', '--extract-audio', '--audio-format', 'mp3', '--audio-quality', '5', '-o', 'audio.%(ext)s', 'https://youtu.be/lIJelwO8yHQ\\\\?si\\\\=X4afLANYrP9pmlZZ']\n[debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)\n[debug] yt-dlp version stable@2026.02.21 from yt-dlp/yt-dlp [646bb31f3] (pip)\n[debug] Python 3.12.12 (CPython x86_64 64bit) - macOS-12.7.6-x86_64-i386-64bit (OpenSSL 3.5.5 27 Jan 2026)\n[debug] exe versions: ffmpeg 8.0.1 (setts), ffprobe 8.0.1\n[debug] Optional libraries: sqlite3-3.50.4\n[debug] JS runtimes: none\n[debug] Proxy map: {}\n[debug] Request Handlers: urllib\n[debug] Plugin directories: none\n[debug] Loaded 1864 extractors\n[debug] [youtube] [pot] PO Token Providers: none\n[debug] [youtube] [pot] PO Token Cache Providers: memory\n[debug] [youtube] [pot] PO Token Cache Spec Providers: webpo\n[debug] [youtube] [jsc] JS Challenge Providers: bun (unavailable), deno (log: /Users/user/.openclaw/workspace/projects/abq-media/youtu-be-lijelwo8yhq-si-x4aflanyrp9pmlzz-transcript-2026-02-25/run-2026-02-25T10-36-21-306Z/prep.log)"
+}
