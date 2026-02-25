@@ -18,18 +18,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import {
+  SourceEngine,
+  TranscriptionEngine,
+  TextToSpeechEngine,
+  VideoEngine,
+} from '../../../core/src/engines';
+import { EngineRegistry } from '../../../core/src/engine-registry';
+import { Recipe } from '../../../core/src/recipe';
+
 import type {
   CLIContext,
   State,
   StageResult,
   StageHandler,
-  StageRegistry,
   SerializedCLIContext,
 } from './types.js';
 import { TERMINAL_STATES } from './types.js';
 import { assertValidTransition } from './transitions.js';
+import { validateContextForState } from './context.js';
 import { PipelineError, UserCancelledError, CheckpointError } from '../utils/errors.js';
 import { ensureDir, readJson, writeJson } from '../utils/fs.js';
+import { YouTubeUrl } from '../utils/youtube-url.js';
 import { clack } from '../ui/prompts.js';
 
 // ---------------------------------------------------------------------------
@@ -61,9 +71,14 @@ function serializeContext(ctx: CLIContext, index: number): SerializedCLIContext 
   if (raw.startedAt instanceof Date) {
     raw.startedAt = raw.startedAt.toISOString();
   }
-  // Serialize Error → { message, stack }
+  // Serialize Error → { message, stack, state? }
   if (raw.lastError instanceof Error) {
-    raw.lastError = { message: raw.lastError.message, stack: raw.lastError.stack };
+    raw.lastError = {
+      message: raw.lastError.message,
+      stack: raw.lastError.stack,
+      // Preserve PipelineError.state for diagnostics on resume
+      state: (raw.lastError as unknown as Record<string, unknown>).state,
+    };
   }
 
   return {
@@ -91,12 +106,27 @@ function deserializeContext(data: SerializedCLIContext): CLIContext {
   if (typeof raw.startedAt === 'string') {
     raw.startedAt = new Date(raw.startedAt);
   }
-  // Restore Error
+  // Restore Error (including PipelineError.state if present)
   if (raw.lastError && typeof raw.lastError === 'object' && 'message' in raw.lastError) {
-    const err = new Error((raw.lastError as { message: string }).message);
-    err.stack = (raw.lastError as { stack?: string }).stack;
+    const saved = raw.lastError as { message: string; stack?: string; state?: string };
+    const err = new Error(saved.message);
+    err.stack = saved.stack;
+    // Re-attach state property for diagnostics (PipelineError compat)
+    if (saved.state) (err as unknown as Record<string, unknown>).state = saved.state;
     raw.lastError = err;
   }
+
+  // Defensive defaults for required non-optional fields
+  raw.outputFiles = raw.outputFiles ?? [];
+
+  // Restore YouTubeUrl value object from serialized string
+  if (typeof raw.youtubeUrl === 'string') {
+    raw.youtubeUrl = YouTubeUrl.parse(raw.youtubeUrl) ?? undefined;
+  }
+
+  // Clear transient flags that should not survive a resume
+  raw.articleRetryRequested = undefined;
+
   // Remove checkpoint-only fields
   delete raw.checkpointedAt;
   delete raw.checkpointIndex;
@@ -108,10 +138,12 @@ function deserializeContext(data: SerializedCLIContext): CLIContext {
 // ---------------------------------------------------------------------------
 
 export interface RunnerOptions {
-  /** The stage registry mapping State → StageHandler. */
-  registry: StageRegistry;
+  /** The engine registry. */
+  registry: EngineRegistry;
   /** Initial context (for a fresh run). */
   context: CLIContext;
+  /** The recipe to execute. */
+  recipe: Recipe;
   /**
    * If true, skip checkpoint writes (useful in tests or --debugger mode).
    * Default: false.
@@ -133,8 +165,9 @@ export interface RunnerOptions {
  * ```
  */
 export class PipelineRunner {
-  private registry: StageRegistry;
+  private registry: EngineRegistry;
   private ctx: CLIContext;
+  private recipe: Recipe;
   private skipCheckpoints: boolean;
   private maxIterations: number;
   private iteration = 0;
@@ -142,6 +175,7 @@ export class PipelineRunner {
   constructor(opts: RunnerOptions) {
     this.registry = opts.registry;
     this.ctx = opts.context;
+    this.recipe = opts.recipe;
     this.skipCheckpoints = opts.skipCheckpoints ?? false;
     this.maxIterations = opts.maxIterations ?? MAX_ITERATIONS;
   }
@@ -197,6 +231,27 @@ export class PipelineRunner {
         saveCheckpoint(this.ctx, this.iteration);
       }
 
+      // Validate context preconditions for the upcoming state
+      try {
+        validateContextForState(this.ctx, state);
+      } catch (err) {
+        const wrapped = err instanceof PipelineError
+          ? err
+          : new PipelineError(
+            err instanceof Error ? err.message : String(err),
+            state,
+            err instanceof Error ? err : undefined,
+          );
+        clack.log.error(`Precondition failed for '${state}': ${wrapped.message}`);
+        this.ctx = {
+          ...this.ctx,
+          currentState: 'ERROR',
+          lastError: wrapped,
+          stateHistory: [...this.ctx.stateHistory, 'ERROR'],
+        };
+        break;
+      }
+
       let result: StageResult;
       try {
         result = await handler(this.ctx);
@@ -230,20 +285,26 @@ export class PipelineRunner {
       }
 
       // Validate transition
-      try {
-        assertValidTransition(state, result.nextState, result.context);
-      } catch (validationErr) {
-        clack.log.error(
-          `Invalid transition from '${state}' → '${result.nextState}'. ` +
-          `${validationErr instanceof Error ? validationErr.message : String(validationErr)}`,
-        );
-        this.ctx = {
-          ...this.ctx,
-          currentState: 'ERROR',
-          lastError: validationErr instanceof Error ? validationErr : new Error(String(validationErr)),
-          stateHistory: [...this.ctx.stateHistory, 'ERROR'],
-        };
-        break;
+      // ERROR is a universal escape hatch — handlers may return it from any
+      // state. Skip transition validation for ERROR so the handler's original
+      // error context is preserved (otherwise assertValidTransition would
+      // overwrite lastError with a generic "Invalid transition" error).
+      if (result.nextState !== 'ERROR') {
+        try {
+          assertValidTransition(state, result.nextState, result.context);
+        } catch (validationErr) {
+          clack.log.error(
+            `Invalid transition from '${state}' → '${result.nextState}'. ` +
+            `${validationErr instanceof Error ? validationErr.message : String(validationErr)}`,
+          );
+          this.ctx = {
+            ...this.ctx,
+            currentState: 'ERROR',
+            lastError: validationErr instanceof Error ? validationErr : new Error(String(validationErr)),
+            stateHistory: [...this.ctx.stateHistory, 'ERROR'],
+          };
+          break;
+        }
       }
 
       // Advance
@@ -267,7 +328,8 @@ export class PipelineRunner {
    */
   static async resume(
     checkpointFile: string,
-    registry: StageRegistry,
+    registry: EngineRegistry,
+    recipe: Recipe,
     opts?: { skipCheckpoints?: boolean; maxIterations?: number },
   ): Promise<CLIContext> {
     if (!fs.existsSync(checkpointFile)) {
@@ -283,6 +345,7 @@ export class PipelineRunner {
     const runner = new PipelineRunner({
       registry,
       context: ctx,
+      recipe,
       skipCheckpoints: opts?.skipCheckpoints,
       maxIterations: opts?.maxIterations,
     });
@@ -302,15 +365,56 @@ export class PipelineRunner {
       throw new PipelineError(`Cannot look up handler for terminal state '${state}'`, state);
     }
 
-    const key = state as keyof StageRegistry;
-    const handler = this.registry[key];
+    const handler = async (context: CLIContext): Promise<StageResult> => {
+      let nextState: State = 'ERROR';
+      let newContext = { ...context };
 
-    if (!handler) {
-      throw new PipelineError(
-        `No handler registered for state '${state}'`,
-        state,
-      );
-    }
+      switch (state) {
+        case 'INPUT_YOUTUBE': {
+          const engine = this.registry.get<SourceEngine>(this.recipe.source.engine);
+          const result = await engine.fetch(new URL(this.recipe.source.url));
+          // In a real implementation, we would save the transcript to a file
+          // and update the context with the file path.
+          newContext = {
+            ...context,
+            // Placeholder for where the audio file path would be stored
+            audioFilePath: result.audioFilePath,
+          };
+          nextState = 'TRANSCRIPTION';
+          break;
+        }
+        case 'TRANSCRIPTION': {
+          const engine = this.registry.get<TranscriptionEngine>(this.recipe.transcription.engine);
+          const transcript = await engine.transcribe(context.audioFilePath);
+          // In a real implementation, we would save the transcript to a file
+          // and update the context with the file path.
+          newContext = {
+            ...context,
+            transcript,
+          };
+          nextState = 'TTS_RENDER';
+          break;
+        }
+        case 'TTS_RENDER': {
+          const engine = this.registry.get<TextToSpeechEngine>(this.recipe.tts.engine);
+          const outputFilePath = path.join(context.runDir, 'output.mp3');
+          await engine.synthesize(context.transcript, 'voiceId-placeholder', outputFilePath);
+          newContext = {
+            ...context,
+            outputFiles: [outputFilePath],
+          };
+          nextState = 'COMPLETE';
+          break;
+        }
+        default:
+          throw new PipelineError(`No handler for state: ${state}`, state);
+      }
+
+      return {
+        nextState,
+        context: newContext,
+      };
+    };
 
     return handler;
   }
@@ -330,26 +434,6 @@ export class PipelineRunner {
  * Each stage file imports types/utils/transitions but not the runner,
  * so the graph is acyclic at runtime.
  */
-export async function createDefaultRegistry(): Promise<StageRegistry> {
-  const stages = await import('../stages/index.js');
-
-  return {
-    PROJECT_INIT: stages.projectInit,
-    INPUT_SELECT: stages.inputSelect,
-    INPUT_YOUTUBE: stages.inputYoutube,
-    INPUT_AUDIO: stages.inputAudio,
-    INPUT_TEXT: stages.inputText,
-    TRANSCRIPTION: stages.transcription,
-    TRANSCRIPT_REVIEW: stages.transcriptReview,
-    PROCESSING_SELECT: stages.processingSelect,
-    RESEARCH_PROMPT_GEN: stages.researchPromptGen,
-    RESEARCH_EXECUTE: stages.researchExecute,
-    ARTICLE_GENERATE: stages.articleGenerate,
-    ARTICLE_REVIEW: stages.articleReview,
-    TRANSLATE: stages.translate,
-    OUTPUT_SELECT: stages.outputSelect,
-    SCRIPT_GENERATE: stages.scriptGenerate,
-    TTS_RENDER: stages.ttsRender,
-    PACKAGE: stages.packageOutput,
-  };
+export async function createDefaultRegistry(): Promise<EngineRegistry> {
+  return new EngineRegistry();
 }

@@ -12,12 +12,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { State } from '../machine/types.js';
+import { Recipe, RecipeSchema } from '../../../core/src/recipe';
 import { ALL_STATES, TERMINAL_STATES } from '../machine/types.js';
 import { createInitialContext } from '../machine/context.js';
 import { PipelineRunner, createDefaultRegistry } from '../machine/runner.js';
+import { YouTubeEngine } from '@abq/engine-youtube';
+import { WhisperEngine } from '@abq/engine-whisper';
+import { ElevenLabsEngine } from '@abq/engine-elevenlabs';
 import { clack } from '../ui/prompts.js';
 import { PipelineError } from '../utils/errors.js';
+import { readJson } from '../utils/fs';
 
 // ---------------------------------------------------------------------------
 // argv helpers
@@ -42,6 +46,23 @@ export async function cmdRun(): Promise<void> {
   const debugMode = hasFlag('--debugger');
   const projectArg = arg('--project');
   const langArg = arg('--lang', 'es');
+  const recipeArg = arg('--recipe');
+
+  if (!recipeArg) {
+    clack.log.error('A recipe is required: --recipe ./path/to/recipe.json');
+    process.exitCode = 1;
+    return;
+  }
+
+  let recipe: Recipe;
+  try {
+    const recipeJson = readJson(recipeArg);
+    recipe = RecipeSchema.parse(recipeJson);
+  } catch (err) {
+    clack.log.error(`Invalid recipe: ${err.message}`);
+    process.exitCode = 1;
+    return;
+  }
 
   // ── Debugger fast-path ────────────────────────────────────────────
   // Mirrors monolith: copy sample artifacts, skip all external calls.
@@ -84,6 +105,16 @@ export async function cmdRun(): Promise<void> {
   }
 
   const registry = await createDefaultRegistry();
+  registry.register(new YouTubeEngine());
+  // This is a placeholder for where you would get your API keys
+  const whisperApiKey = process.env.OPENAI_API_KEY;
+  if (whisperApiKey) {
+    registry.register(new WhisperEngine(whisperApiKey));
+  }
+  const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+  if (elevenLabsApiKey) {
+    registry.register(new ElevenLabsEngine(elevenLabsApiKey));
+  }
 
   // ── Resume from checkpoint ──────────────────────────────────────────
   if (resumeArg) {
@@ -105,7 +136,7 @@ export async function cmdRun(): Promise<void> {
 
     clack.intro('abq-media run (resuming)');
     try {
-      const finalCtx = await PipelineRunner.resume(checkpointFile, registry, {
+      const finalCtx = await PipelineRunner.resume(checkpointFile, registry, recipe, {
         skipCheckpoints: debugMode,
       });
       if (finalCtx.currentState === 'ERROR') {
@@ -148,6 +179,7 @@ export async function cmdRun(): Promise<void> {
   const runner = new PipelineRunner({
     registry,
     context: ctx,
+    recipe,
     skipCheckpoints: debugMode,
   });
 
