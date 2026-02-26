@@ -103,6 +103,21 @@ export {
   type IngestInput,
   type IngestOutput,
   extractVideoId,
+  // ingest stages
+  youtubeIngestStage,
+  captionsStage,
+  ytdlpSubsStage,
+  ytAsrStage,
+  textFileIngestStage,
+  audioFileIngestStage,
+  // process stages
+  digestStage,
+  researchPromptStage,
+  // generate stages
+  generateArticleStage,
+  generatePodcastScriptStage,
+  generateReelScriptStage,
+  generateSocialPostsStage,
   // yt-dlp sub-stage additions
   probeStage,
   type YtdlpOverrides,

@@ -146,6 +146,9 @@ async function cmdPrep() {
     }
   }
 
+  // Load config early so we can validate flags before running the pipeline
+  const config = loadConfig({ lang });
+
   // --- Pick the right ingest stage ---
   let ingestStage;
   if (textInline || textFile) {
@@ -161,6 +164,10 @@ async function cmdPrep() {
       alternatives: [captionsStage, ytdlpSubsStage],
     });
   } else if (useAsrOnly) {
+    if (!config.asr.apiKey) {
+      console.error('ASR not configured. Set asrApiKey / OPENAI_API_KEY to enable ASR fallback.');
+      process.exit(1);
+    }
     ingestStage = ytAsrStage;
   } else {
     ingestStage = youtubeIngestStage; // FallbackStage with caption→ytdlp→asr chain
@@ -168,8 +175,6 @@ async function cmdPrep() {
 
   // --- Build the prep pipeline ---
   const outDir = path.resolve(process.cwd(), 'output', `prep-${nowStamp()}`);
-
-  const config = loadConfig({ lang });
 
   const pipeline = new Pipeline({
     name: 'prep',
