@@ -4,18 +4,35 @@
   "description": "CLI for Abquanta media pipeline.",
   "type": "module",
   "bin": {
-    "abq-media": "src/cli.js"
+    "abq-media": "dist/cli.js"
   },
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "@clack/prompts": "^0.7.0"
+    "@abquanta/abq-media-core": "^0.2.0",
+    "@clack/prompts": "^0.7.0",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
   },
   "scripts": {
-    "init": "node ./src/cli.js init",
-    "build": "echo 'build cli'",
-    "test": "node --test test/smoke.test.js",
-    "lint": "echo 'lint cli'",
-    "clean": "echo 'clean cli'"
+    "build": "tsc -p tsconfig.json && cp src/cli.monolith.js dist/cli.monolith.js && mkdir -p dist/recipes dist/prompts && cp -R src/recipes/builtin dist/recipes/builtin && cp -R src/prompts/defaults dist/prompts/defaults",
+    "init": "node ./dist/cli.js init",
+    "test": "npm run build && node --test test/smoke.test.js",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   }
 }

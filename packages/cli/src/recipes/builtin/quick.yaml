@@ -1,0 +1,14 @@
+name: quick
+description: Fast podcast, skip research
+version: 1
+stages:
+  - name: transcript
+    enabled: true
+  - name: research-prompt
+    enabled: false
+  - name: research
+    enabled: false
+  - name: script
+    enabled: true
+  - name: tts
+    enabled: true

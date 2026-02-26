@@ -3,3 +3,7 @@ output/
 node_modules/
 .env
 *.local
+
+dist/
+*.tmp
+karaoke_input.txt

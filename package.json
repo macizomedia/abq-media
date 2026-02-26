@@ -1,6 +1,7 @@
 {
   "name": "@abquanta/abq-media-workspace",
   "private": true,
+  "type": "module",
   "version": "0.1.0",
   "description": "Monorepo for Abquanta media intelligence pipeline (YouTube -> transcript -> digest -> research prompt -> podcast/video).",
   "license": "MIT",
@@ -30,5 +31,8 @@
     "narratome:render": "npm run narratome:render -w @abquanta/engine-narratome --",
     "narratome:run": "npm run narratome:run -w @abquanta/engine-narratome --",
     "narratome:doctor": "npm run narratome:doctor -w @abquanta/engine-narratome --"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

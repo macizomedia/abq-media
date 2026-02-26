@@ -9,10 +9,23 @@ import http from 'node:http';
 const CLI = path.resolve(import.meta.dirname, '../src/cli.js');
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'abq-smoke-'));
 
-test('doctor returns valid JSON', () => {
+// Temp HOME with no credentials — used by tests that verify "no config" error paths.
+// Isolates from ~/.abq-media/credentials.json and real API key env vars.
+const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'abq-home-'));
+const cleanEnv = {
+  PATH: process.env.PATH,
+  HOME: tempHome,
+  TMPDIR: process.env.TMPDIR || os.tmpdir(),
+};
+
+// ---------------------------------------------------------------------------
+// Phase A smoke tests (required)
+// ---------------------------------------------------------------------------
+
+test('doctor returns valid JSON with ok field', () => {
   const out = execSync(`node ${CLI} doctor`, { cwd, encoding: 'utf8' });
   const json = JSON.parse(out);
-  assert.ok(json.ok !== undefined);
+  assert.ok(json.ok !== undefined, 'Report must have ok field');
 });
 
 test('prep with --text creates output artifacts', () => {
@@ -22,9 +35,9 @@ test('prep with --text creates output artifacts', () => {
   const runs = fs.readdirSync(outDir).filter(d => d.startsWith('prep-'));
   assert.ok(runs.length > 0, 'Should have prep output dir');
   const run = path.join(outDir, runs[0]);
-  assert.ok(fs.existsSync(path.join(run, 'metadata.json')));
-  assert.ok(fs.existsSync(path.join(run, 'digest.md')));
-  assert.ok(fs.existsSync(path.join(run, 'deep_research_prompt.md')));
+  assert.ok(fs.existsSync(path.join(run, 'metadata.json')), 'metadata.json missing');
+  assert.ok(fs.existsSync(path.join(run, 'digest.md')), 'digest.md missing');
+  assert.ok(fs.existsSync(path.join(run, 'deep_research_prompt.md')), 'deep_research_prompt.md missing');
 });
 
 test('prep with --transcript-file creates output artifacts', () => {
@@ -33,7 +46,11 @@ test('prep with --transcript-file creates output artifacts', () => {
   execSync(`node ${CLI} prep --transcript-file test-transcript.txt`, { cwd, encoding: 'utf8' });
   const outDir = path.join(cwd, 'output');
   const runs = fs.readdirSync(outDir).filter(d => d.startsWith('prep-'));
-  assert.ok(runs.length > 0);
+  assert.ok(runs.length > 0, 'Should have prep output dir');
+  const run = path.join(outDir, runs[runs.length - 1]);
+  assert.ok(fs.existsSync(path.join(run, 'metadata.json')), 'metadata.json missing');
+  assert.ok(fs.existsSync(path.join(run, 'digest.md')), 'digest.md missing');
+  assert.ok(fs.existsSync(path.join(run, 'deep_research_prompt.md')), 'deep_research_prompt.md missing');
 });
 
 test('latest returns a path after prep runs', () => {
@@ -41,6 +58,10 @@ test('latest returns a path after prep runs', () => {
   assert.ok(out.length > 0, 'Should return a path');
   assert.ok(fs.existsSync(out), 'Returned path should exist');
 });
+
+// ---------------------------------------------------------------------------
+// Prep edge-case smoke tests
+// ---------------------------------------------------------------------------
 
 test('prep fails when audio file is missing', () => {
   try {
@@ -55,7 +76,12 @@ test('prep fails when audio file is missing', () => {
 test('prep with --use-asr fails without ASR config', () => {
   const url = 'https://youtu.be/dQw4w9WgXcQ';
   try {
-    execSync(`node ${CLI} prep --url ${url} --use-asr true`, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    execSync(`node ${CLI} prep --url ${url} --use-asr`, {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe',
+      env: cleanEnv,
+    });
     assert.fail('Expected prep to fail when ASR is not configured');
   } catch (err) {
     const stderr = String(err?.stderr || '');
@@ -66,7 +92,7 @@ test('prep with --use-asr fails without ASR config', () => {
 test('prep rejects conflicting flags', () => {
   const url = 'https://youtu.be/dQw4w9WgXcQ';
   try {
-    execSync(`node ${CLI} prep --url ${url} --use-asr true --use-captions true`, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    execSync(`node ${CLI} prep --url ${url} --use-asr --use-captions`, { cwd, encoding: 'utf8', stdio: 'pipe' });
     assert.fail('Expected prep to fail for conflicting flags');
   } catch (err) {
     const stderr = String(err?.stderr || '');
@@ -74,21 +100,18 @@ test('prep rejects conflicting flags', () => {
   }
 });
 
-test('publish without llmProvider fails with clear error', () => {
-  const input = path.join(cwd, 'deep_research_prompt.md');
-  fs.writeFileSync(input, '# Deep Research Brief\n\nContenido de prueba.\n');
-  try {
-    execSync(`node ${CLI} publish --input deep_research_prompt.md`, { cwd, encoding: 'utf8', stdio: 'pipe' });
-    assert.fail('Expected publish to fail without llmProvider');
-  } catch (err) {
-    const stderr = String(err?.stderr || '');
-    assert.match(stderr, /LLM provider not configured/i);
-  }
-});
+// ---------------------------------------------------------------------------
+// Publish smoke tests
+// ---------------------------------------------------------------------------
 
 test('publish fails when input file is missing', () => {
   try {
-    execSync(`node ${CLI} publish --input missing.md`, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    execSync(`node ${CLI} publish --input missing.md`, {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe',
+      env: cleanEnv,
+    });
     assert.fail('Expected publish to fail for missing input');
   } catch (err) {
     const stderr = String(err?.stderr || '');
@@ -96,6 +119,25 @@ test('publish fails when input file is missing', () => {
   }
 });
 
+test('publish without LLM API key fails with clear error', () => {
+  const input = path.join(cwd, 'deep_research_prompt.md');
+  fs.writeFileSync(input, '# Deep Research Brief\n\nContenido de prueba.\n');
+  try {
+    execSync(`node ${CLI} publish --input deep_research_prompt.md`, {
+      cwd,
+      encoding: 'utf8',
+      stdio: 'pipe',
+      env: cleanEnv,
+    });
+    assert.fail('Expected publish to fail without LLM API key');
+  } catch (err) {
+    const stderr = String(err?.stderr || '');
+    assert.match(stderr, /LLM API key not configured/i);
+  }
+});
+
+// Opt-in mock test: set ABQ_RUN_PUBLISH_MOCK=1 to enable.
+// Skipped by default because it requires baseUrl support in the LLM provider.
 const runPublishMock = process.env.ABQ_RUN_PUBLISH_MOCK === '1';
 
 (runPublishMock ? test : test.skip)('publish succeeds with mocked LLM endpoint', async () => {
@@ -128,15 +170,19 @@ const runPublishMock = process.env.ABQ_RUN_PUBLISH_MOCK === '1';
   const baseUrl = `http://127.0.0.1:${port}`;
 
   try {
-    execSync(`node ${CLI} prep --text \"Texto suficientemente largo para crear un prompt de investigación que luego se use con --latest en publish.\"`, { cwd, encoding: 'utf8' });
     const configPath = path.join(cwd, '.abq-module.json');
     fs.writeFileSync(configPath, JSON.stringify({
       llmProvider: 'openai',
-      llmApiKey: 'test-key',
-      baseUrl
+      openaiApiKey: 'test-key',
+      baseUrl,
     }, null, 2));
 
-    execSync(`node ${CLI} publish --latest`, { cwd, encoding: 'utf8', timeout: 10000 });
+    execSync(`node ${CLI} publish --input deep_research_prompt.md`, {
+      cwd,
+      encoding: 'utf8',
+      timeout: 10000,
+      env: cleanEnv,
+    });
 
     const outDir = path.join(cwd, 'output');
     const runs = fs.readdirSync(outDir).filter(d => d.startsWith('publish-'));
@@ -148,84 +194,8 @@ const runPublishMock = process.env.ABQ_RUN_PUBLISH_MOCK === '1';
     assert.ok(fs.existsSync(path.join(run, 'reel_script.md')));
     assert.ok(fs.existsSync(path.join(run, 'social_posts.md')));
   } finally {
+    try { fs.unlinkSync(path.join(cwd, '.abq-module.json')); } catch { /* ignore */ }
     await new Promise((resolve) => server.close(resolve));
-    for (const socket of sockets) {
-      socket.destroy();
-    }
-  }
-});
-test('publish without llmProvider fails with clear error', () => {
-  const input = path.join(cwd, 'deep_research_prompt.md');
-  fs.writeFileSync(input, '# Deep Research Brief\n\nContenido de prueba.\n');
-  try {
-    execSync(`node ${CLI} publish --input deep_research_prompt.md`, { cwd, encoding: 'utf8', stdio: 'pipe' });
-    assert.fail('Expected publish to fail without llmProvider');
-  } catch (err) {
-    const stderr = String(err?.stderr || '');
-    assert.match(stderr, /LLM provider not configured/i);
-  }
-});
-
-test('publish fails when input file is missing', () => {
-  try {
-    execSync(`node ${CLI} publish --input missing.md`, { cwd, encoding: 'utf8', stdio: 'pipe' });
-    assert.fail('Expected publish to fail for missing input');
-  } catch (err) {
-    const stderr = String(err?.stderr || '');
-    assert.match(stderr, /Input file not found/i);
-  }
-});
-
-test('publish succeeds with mocked LLM endpoint', async () => {
-  const prompt = path.join(cwd, 'deep_research_prompt.md');
-  fs.writeFileSync(prompt, '# Deep Research Brief\n\nContenido de prueba.\n');
-
-  const sockets = new Set();
-  const server = http.createServer((req, res) => {
-    if (req.method === 'POST' && req.url === '/chat/completions') {
-      let body = '';
-      req.on('data', (c) => { body += c; });
-      req.on('end', () => {
-        res.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
-        res.end(JSON.stringify({ choices: [{ message: { content: 'OK mock output' } }] }));
-      });
-      return;
-    }
-    res.writeHead(404);
-    res.end();
-  });
-  server.on('connection', (socket) => {
-    sockets.add(socket);
-    socket.on('close', () => sockets.delete(socket));
-  });
-
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address();
-  const baseUrl = `http://127.0.0.1:${port}`;
-
-  try {
-    const configPath = path.join(cwd, '.abq-module.json');
-    fs.writeFileSync(configPath, JSON.stringify({
-      llmProvider: 'openai',
-      llmApiKey: 'test-key',
-      baseUrl
-    }, null, 2));
-
-    execSync(`node ${CLI} publish --input deep_research_prompt.md`, { cwd, encoding: 'utf8' });
-
-    const outDir = path.join(cwd, 'output');
-    const runs = fs.readdirSync(outDir).filter(d => d.startsWith('publish-'));
-    assert.ok(runs.length > 0, 'Should have publish output dir');
-    const run = path.join(outDir, runs[0]);
-    assert.ok(fs.existsSync(path.join(run, 'metadata.json')));
-    assert.ok(fs.existsSync(path.join(run, 'podcast_script.md')));
-    assert.ok(fs.existsSync(path.join(run, 'article.md')));
-    assert.ok(fs.existsSync(path.join(run, 'reel_script.md')));
-    assert.ok(fs.existsSync(path.join(run, 'social_posts.md')));
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-    for (const socket of sockets) {
-      socket.destroy();
-    }
+    for (const socket of sockets) socket.destroy();
   }
 });

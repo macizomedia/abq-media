@@ -1,0 +1,93 @@
+2026-02-25T10:03:13.665Z [start] ingest:youtube
+2026-02-25T10:03:13.666Z [progress] ingest:youtube: Trying transcribe:captions…
+2026-02-25T10:03:13.666Z [progress] transcribe:captions: Trying endpoint: lang=es-ES
+2026-02-25T10:03:14.452Z [progress] transcribe:captions: Trying endpoint: lang=es-ES
+2026-02-25T10:03:14.898Z [progress] transcribe:captions: Trying endpoint: lang=es-ES
+2026-02-25T10:03:15.240Z [progress] transcribe:captions: Trying endpoint: lang=es-ES
+2026-02-25T10:03:15.574Z [progress] transcribe:captions: Trying endpoint: lang=es
+2026-02-25T10:03:15.822Z [progress] transcribe:captions: Trying endpoint: lang=es
+2026-02-25T10:03:16.072Z [progress] transcribe:captions: Trying endpoint: lang=es
+2026-02-25T10:03:16.541Z [progress] transcribe:captions: Trying endpoint: lang=es
+2026-02-25T10:03:17.069Z [progress] transcribe:captions: Trying endpoint: lang=en
+2026-02-25T10:03:17.514Z [progress] transcribe:captions: Trying endpoint: lang=en
+2026-02-25T10:03:17.814Z [progress] transcribe:captions: Trying endpoint: lang=en
+2026-02-25T10:03:18.156Z [progress] transcribe:captions: Trying endpoint: lang=en
+2026-02-25T10:03:18.565Z [progress] transcribe:captions: Trying endpoint: lang=en-US
+2026-02-25T10:03:18.930Z [progress] transcribe:captions: Trying endpoint: lang=en-US
+2026-02-25T10:03:19.338Z [progress] transcribe:captions: Trying endpoint: lang=en-US
+2026-02-25T10:03:19.866Z [progress] transcribe:captions: Trying endpoint: lang=en-US
+2026-02-25T10:03:20.260Z [error] transcribe:captions: No captions found for any language candidate
+2026-02-25T10:03:20.712Z [progress] ingest:youtube: Trying transcribe:ytdlp…
+2026-02-25T10:03:20.713Z [progress] transcribe:ytdlp: Downloading subtitles with yt-dlp…
+2026-02-25T10:03:33.898Z [progress] transcribe:ytdlp: yt-dlp stdout:
+[generic] Extracting URL: https://www.youtube.com/watch\?v\=QWzLPn164w0
+[generic] watch\?v\=QWzLPn164w0: Downloading webpage
+[redirect] Following redirect to https://consent.youtube.com/m?continue=https%3A%2F%2Fwww.youtube.com%2Fwatch%255C%3Fv%255C%3DQWzLPn164w0%26cbrd%3D1&gl=DE&m=0&pc=yt&cm=2&hl=en&src=1
+[youtube:consent] Extracting URL: https://consent.youtube.com/m?continue=https%3A%2F%2Fwww.youtube.com%2Fwatch%255C%3Fv%255C%3DQWzL...=yt&cm=2&hl=en&src=1
+[generic] Extracting URL: https://www.youtube.com/watch%5C?v%5C=QWzLPn164w0&cbrd=1
+[generic] watch\?v\=QWzLPn164w0&cbrd=1: Downloading webpage
+[redirect] Following redirect to https://www.youtube.com/watch/a?v%5C=QWzLPn164w0&cbrd=1&v=LeJ8pCRYExE
+[generic] Extracting URL: https://www.youtube.com/watch/a?v%5C=QWzLPn164w0&cbrd=1&v=LeJ8pCRYExE
+[generic] a?v\=QWzLPn164w0&cbrd=1&v=LeJ8pCRYExE: Downloading webpage
+[generic] a?v\=QWzLPn164w0&cbrd=1&v=LeJ8pCRYExE: Extracting information
+[youtube] Extracting URL: https://www.youtube.com/embed/LeJ8pCRYExE
+[youtube] LeJ8pCRYExE: Downloading webpage
+[youtube] LeJ8pCRYExE: Downloading android vr player API JSON
+[info] LeJ8pCRYExE: Downloading 1 format(s): 399+251
+[info] There are no subtitles for the requested languages
+
+2026-02-25T10:03:33.899Z [progress] transcribe:ytdlp: yt-dlp stderr:
+WARNING: [generic] Falling back on generic information extractor
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+
+2026-02-25T10:03:33.901Z [progress] transcribe:ytdlp: Files in temp dir after yt-dlp: []
+2026-02-25T10:03:33.901Z [error] transcribe:ytdlp: yt-dlp produced no subtitle files. Files found: [none]. stderr: WARNING: [generic] Falling back on generic information extractor
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+
+2026-02-25T10:03:33.913Z [progress] ingest:youtube: Trying transcribe:yt-asr…
+2026-02-25T10:03:33.922Z [progress] transcribe:yt-asr: Downloading audio with yt-dlp…
+2026-02-25T10:03:41.922Z [progress] transcribe:yt-asr: yt-dlp stdout:
+[generic] Extracting URL: https://www.youtube.com/watch\?v\=QWzLPn164w0
+[generic] watch\?v\=QWzLPn164w0: Downloading webpage
+[redirect] Following redirect to https://consent.youtube.com/m?continue=https%3A%2F%2Fwww.youtube.com%2Fwatch%255C%3Fv%255C%3DQWzLPn164w0%26cbrd%3D1&gl=DE&m=0&pc=yt&cm=2&hl=en&src=1
+[youtube:consent] Extracting URL: https://consent.youtube.com/m?continue=https%3A%2F%2Fwww.youtube.com%2Fwatch%255C%3Fv%255C%3DQWzL...=yt&cm=2&hl=en&src=1
+[generic] Extracting URL: https://www.youtube.com/watch%5C?v%5C=QWzLPn164w0&cbrd=1
+[generic] watch\?v\=QWzLPn164w0&cbrd=1: Downloading webpage
+[redirect] Following redirect to https://www.youtube.com/watch/a?v%5C=QWzLPn164w0&cbrd=1&v=LeJ8pCRYExE
+[generic] Extracting URL: https://www.youtube.com/watch/a?v%5C=QWzLPn164w0&cbrd=1&v=LeJ8pCRYExE
+[generic] a?v\=QWzLPn164w0&cbrd=1&v=LeJ8pCRYExE: Downloading webpage
+[generic] a?v\=QWzLPn164w0&cbrd=1&v=LeJ8pCRYExE: Extracting information
+[youtube] Extracting URL: https://www.youtube.com/embed/LeJ8pCRYExE
+[youtube] LeJ8pCRYExE: Downloading webpage
+[youtube] LeJ8pCRYExE: Downloading android vr player API JSON
+[info] LeJ8pCRYExE: Downloading 1 format(s): 251
+[download] Destination: audio.webm
+[download]   0.1% of  993.56KiB at  258.25KiB/s ETA 00:03[download]   0.3% of  993.56KiB at  625.11KiB/s ETA 00:01[download]   0.7% of  993.56KiB at    1.23MiB/s ETA 00:00[download]   1.5% of  993.56KiB at    2.30MiB/s ETA 00:00[download]   3.1% of  993.56KiB at    1.86MiB/s ETA 00:00[download]   6.3% of  993.56KiB at    2.38MiB/s ETA 00:00[download]  12.8% of  993.56KiB at    2.87MiB/s ETA 00:00[download]  25.7% of  993.56KiB at    3.93MiB/s ETA 00:00[download]  51.4% of  993.56KiB at    5.74MiB/s ETA 00:00[download] 100.0% of  993.56KiB at    8.85MiB/s ETA 00:00[download] 100% of  993.56KiB in 00:00:00 at 4.33MiB/s   
+
+2026-02-25T10:03:41.922Z [progress] transcribe:yt-asr: yt-dlp stderr:
+WARNING: [generic] Falling back on generic information extractor
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+
+2026-02-25T10:03:41.924Z [progress] transcribe:yt-asr: Files in temp dir after yt-dlp: [audio.webm]
+2026-02-25T10:03:41.924Z [progress] transcribe:yt-asr: Converting to MP3…
+2026-02-25T10:03:42.967Z [progress] transcribe:yt-asr: Transcribing audio via ASR API…
+2026-02-25T10:03:47.493Z [progress] transcribe:yt-asr: Transcript short with language hint; retrying with auto-detect…
+2026-02-25T10:03:50.958Z [error] transcribe:yt-asr: ASR transcript too short (23 chars, min 40). Lower transcript.minLengthChars in .abq-module.json if needed.
+2026-02-25T10:03:50.958Z [error] ingest:youtube: FallbackStage "ingest:youtube": all 3 alternatives failed:
+  transcribe:captions: No captions found for any language candidate
+  transcribe:ytdlp: yt-dlp produced no subtitle files. Files found: [none]. stderr: WARNING: [generic] Falling back on generic information extractor
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+
+  transcribe:yt-asr: ASR transcript too short (23 chars, min 40). Lower transcript.minLengthChars in .abq-module.json if needed.
+2026-02-25T10:03:50.960Z [error] ingest:youtube: FallbackStage "ingest:youtube": all 3 alternatives failed:
+  transcribe:captions: No captions found for any language candidate
+  transcribe:ytdlp: yt-dlp produced no subtitle files. Files found: [none]. stderr: WARNING: [generic] Falling back on generic information extractor
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+
+  transcribe:yt-asr: ASR transcript too short (23 chars, min 40). Lower transcript.minLengthChars in .abq-module.json if needed.
+2026-02-25T10:03:50.975Z [pipeline:error] Pipeline "prep" failed at stage "ingest:youtube": FallbackStage "ingest:youtube": all 3 alternatives failed:
+  transcribe:captions: No captions found for any language candidate
+  transcribe:ytdlp: yt-dlp produced no subtitle files. Files found: [none]. stderr: WARNING: [generic] Falling back on generic information extractor
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+
+  transcribe:yt-asr: ASR transcript too short (23 chars, min 40). Lower transcript.minLengthChars in .abq-module.json if needed.

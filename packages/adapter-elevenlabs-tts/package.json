@@ -16,6 +16,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "build": "echo 'build adapter-elevenlabs-tts'",
     "tts:render": "node ./src/cli.js render",
     "tts:doctor": "node ./src/cli.js doctor",
     "test": "node --test test/smoke.test.js"

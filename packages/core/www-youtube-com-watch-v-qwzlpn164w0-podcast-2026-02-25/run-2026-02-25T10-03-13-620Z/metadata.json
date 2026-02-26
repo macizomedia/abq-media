@@ -1,0 +1,14 @@
+{
+  "pipeline": "prep",
+  "runId": "2026-02-25T10-03-13-653Z",
+  "startedAt": "2026-02-25T10:03:13.660Z",
+  "completedStages": [],
+  "errors": [
+    {
+      "stage": "ingest:youtube",
+      "message": "FallbackStage \"ingest:youtube\": all 3 alternatives failed:\n  transcribe:captions: No captions found for any language candidate\n  transcribe:ytdlp: yt-dlp produced no subtitle files. Files found: [none]. stderr: WARNING: [generic] Falling back on generic information extractor\nWARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one\n\n  transcribe:yt-asr: ASR transcript too short (23 chars, min 40). Lower transcript.minLengthChars in .abq-module.json if needed."
+    }
+  ],
+  "artifacts": {},
+  "durationMs": 37311
+}

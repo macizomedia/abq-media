@@ -1,0 +1,9 @@
+name: article-nyt
+description: NYT-style article
+version: 1
+stages:
+  - name: transcript
+    enabled: true
+  - name: article
+    enabled: true
+    humanizer: nyt
